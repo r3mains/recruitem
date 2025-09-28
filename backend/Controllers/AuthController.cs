@@ -1,7 +1,9 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using recruitem_backend.Data;
 using recruitem_backend.Models;
+using recruitem_backend.Services;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -12,107 +14,225 @@ namespace recruitem_backend.Controllers
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
-        private readonly UserManager<User> _userManager;
-        private readonly SignInManager<User> _signInManager;
+        private readonly DatabaseContext _context;
+        private readonly IPasswordService _passwordService;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(UserManager<User> userManager, SignInManager<User> signInManager)
+        public AuthController(DatabaseContext context, IPasswordService passwordService, ILogger<AuthController> logger)
         {
-            _userManager = userManager;
-            _signInManager = signInManager;
+            _context = context;
+            _passwordService = passwordService;
+            _logger = logger;
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
-            Console.WriteLine($"Register request: Email={request.Email}, FirstName={request.FirstName}, LastName={request.LastName}, Role={request.Role}");
-
-            var user = new User
+            try
             {
-                UserName = request.Email,
-                Email = request.Email,
-                FirstName = request.FirstName,
-                LastName = request.LastName,
-                Role = request.Role ?? "User"
-            };
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest("Please fill all required fields correctly");
+                }
 
-            var result = await _userManager.CreateAsync(user, request.Password);
+                _logger.LogInformation($"New user trying to register with email: {request.Email}");
 
-            if (result.Succeeded)
-            {
-                var token = CreateToken(user);
-                return Ok(new { token, user = new { user.Id, user.Email, user.FirstName, user.LastName, user.Role } });
+                var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+                if (existingUser != null)
+                {
+                    return BadRequest("User with this email already exists");
+                }
+
+                var role = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == request.RoleName);
+                if (role == null)
+                {
+                    return BadRequest("Invalid role selected");
+                }
+
+                var hashedPassword = _passwordService.HashPassword(request.Password);
+
+                var newUser = new User();
+                newUser.Id = Guid.NewGuid();
+                newUser.Email = request.Email;
+                newUser.Password = hashedPassword;
+                newUser.RoleId = role.Id;
+                newUser.CreatedAt = DateTime.UtcNow;
+                newUser.UpdatedAt = DateTime.UtcNow;
+
+                _context.Users.Add(newUser);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation($"User registered successfully: {request.Email}");
+
+                var token = GenerateJwtToken(newUser);
+
+                return Ok(new
+                {
+                    message = "Registration successful",
+                    token = token,
+                    user = new
+                    {
+                        id = newUser.Id,
+                        email = newUser.Email,
+                        role = role.RoleName
+                    }
+                });
             }
-
-            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-            Console.WriteLine($"Registration failed: {errors}");
-            return BadRequest($"Registration failed: {errors}");
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error during registration: {ex.Message}");
+                return BadRequest("Registration failed. Please try again.");
+            }
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            var user = await _userManager.FindByEmailAsync(request.Email);
-            if (user == null)
-                return BadRequest("User not found");
-
-            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false);
-            if (result.Succeeded)
+            try
             {
-                var token = CreateToken(user);
-                return Ok(new { token, user = new { user.Id, user.Email, user.FirstName, user.LastName, user.Role } });
-            }
+                if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Password))
+                {
+                    return BadRequest("Email and password are required");
+                }
 
-            return BadRequest("Invalid password");
+                _logger.LogInformation($"User trying to login: {request.Email}");
+
+                var user = await _context.Users
+                    .Include(u => u.Role)
+                    .FirstOrDefaultAsync(u => u.Email == request.Email);
+
+                if (user == null)
+                {
+                    _logger.LogWarning($"Login failed: No user found with email {request.Email}");
+                    return BadRequest("Invalid email or password");
+                }
+
+                bool passwordIsCorrect = _passwordService.VerifyPassword(request.Password, user.Password);
+                if (!passwordIsCorrect)
+                {
+                    _logger.LogWarning($"Login failed: Wrong password for {request.Email}");
+                    return BadRequest("Invalid email or password");
+                }
+
+                _logger.LogInformation($"User logged in successfully: {request.Email}");
+
+                var token = GenerateJwtToken(user);
+
+                return Ok(new
+                {
+                    message = "Login successful",
+                    token = token,
+                    user = new
+                    {
+                        id = user.Id,
+                        email = user.Email,
+                        role = user.Role.RoleName
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error during login: {ex.Message}");
+                return BadRequest("Login failed. Please try again.");
+            }
         }
 
         [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
         {
-            var user = await _userManager.FindByEmailAsync(request.Email);
-            if (user == null)
-                return Ok("If email exists, reset link sent");
+            try
+            {
+                if (string.IsNullOrEmpty(request.Email))
+                {
+                    return BadRequest("Email is required");
+                }
 
-            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-            return Ok("Reset link sent");
-        }
+                _logger.LogInformation($"Password reset requested for: {request.Email}");
 
-        [HttpPost("reset-password")]
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+                if (user == null)
+                {
+                    return Ok("If the email exists, a reset link has been sent");
+                }
+
+                var resetToken = Guid.NewGuid().ToString();
+                _logger.LogInformation($"Reset token generated for: {request.Email}");
+
+                return Ok("If the email exists, a reset link has been sent");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error in forgot password: {ex.Message}");
+                return BadRequest("Something went wrong. Please try again.");
+            }
+        }        [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
         {
-            var user = await _userManager.FindByEmailAsync(request.Email);
-            if (user == null)
-                return BadRequest("User not found");
+            try
+            {
+                if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Password) || string.IsNullOrEmpty(request.Token))
+                {
+                    return BadRequest("All fields are required");
+                }
 
-            var result = await _userManager.ResetPasswordAsync(user, request.Token, request.Password);
-            if (result.Succeeded)
-                return Ok("Password reset successfully");
+                _logger.LogInformation($"Password reset attempt for: {request.Email}");
 
-            return BadRequest("Password reset failed");
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+                if (user == null)
+                {
+                    return BadRequest("Invalid reset request");
+                }
+
+                var newHashedPassword = _passwordService.HashPassword(request.Password);
+
+                user.Password = newHashedPassword;
+                user.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation($"Password reset successful for: {request.Email}");
+                return Ok("Password has been reset successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error resetting password: {ex.Message}");
+                return BadRequest("Password reset failed. Please try again.");
+            }
         }
 
         [HttpPost("logout")]
-        public async Task<IActionResult> Logout()
+        public IActionResult Logout()
         {
-            await _signInManager.SignOutAsync();
-            return Ok("Logged out");
+            _logger.LogInformation("User logging out");
+            return Ok("Logout successful");
         }
 
-        private string CreateToken(User user)
+        private string GenerateJwtToken(User user)
         {
+            _logger.LogInformation($"Creating token for user: {user.Email}");
+
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.UTF8.GetBytes("YourSuperSecretKeyThatIsAtLeast32CharactersLongForMaximumSecurity!");
+            var secretKey = "YourSuperSecretKeyThatIsAtLeast32CharactersLongForMaximumSecurity!";
+            var key = Encoding.UTF8.GetBytes(secretKey);
+
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Email, user.Email)
+            };
+
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(new[]
-                {
-                    new Claim(ClaimTypes.NameIdentifier, user.Id),
-                    new Claim(ClaimTypes.Email, user.Email!)
-                }),
-                Expires = DateTime.UtcNow.AddHours(1),
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddHours(24),
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
+
             var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
+            var tokenString = tokenHandler.WriteToken(token);
+
+            _logger.LogInformation($"Token created successfully for user: {user.Email}");
+            return tokenString;
         }
     }
 
@@ -120,9 +240,7 @@ namespace recruitem_backend.Controllers
     {
         public string Email { get; set; } = "";
         public string Password { get; set; } = "";
-        public string FirstName { get; set; } = "";
-        public string LastName { get; set; } = "";
-        public string? Role { get; set; }
+        public string RoleName { get; set; } = "";
     }
 
     public class LoginRequest
