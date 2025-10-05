@@ -1,24 +1,22 @@
-using Backend.Dtos.Jobs;
+using Backend.Dtos.Users;
 using Backend.Services.Interfaces;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Backend.Controllers;
 
 [ApiController]
-[Route("api/jobs")]
-[Authorize]
-public class JobsController(IJobService service) : ControllerBase
+[Route("api/users")]
+public class UsersController(IUserService service) : ControllerBase
 {
   [HttpGet]
-  public async Task<IActionResult> GetAll([FromQuery] Guid? recruiterId, [FromQuery] Guid? statusId, [FromQuery] Guid? positionId)
+  public async Task<ActionResult<List<UserDto>>> GetAll()
   {
-    var data = await service.GetAll(recruiterId, statusId, positionId);
+    var data = await service.GetAll();
     return Ok(data);
   }
 
   [HttpGet("{id}")]
-  public async Task<IActionResult> GetById(Guid id)
+  public async Task<ActionResult<UserDto>> GetById(Guid id)
   {
     var r = await service.GetById(id);
     if (r == null) return NotFound();
@@ -26,14 +24,14 @@ public class JobsController(IJobService service) : ControllerBase
   }
 
   [HttpPost]
-  public async Task<IActionResult> Create(JobCreateDto dto)
+  public async Task<ActionResult<UserDto>> Create(UserCreateDto dto)
   {
     var r = await service.Create(dto);
     return CreatedAtAction(nameof(GetById), new { id = r.Id }, r);
   }
 
   [HttpPut("{id}")]
-  public async Task<IActionResult> Update(Guid id, JobUpdateDto dto)
+  public async Task<ActionResult<UserDto>> Update(Guid id, UserUpdateDto dto)
   {
     var r = await service.Update(id, dto);
     if (r == null) return NotFound();
@@ -43,7 +41,8 @@ public class JobsController(IJobService service) : ControllerBase
   [HttpDelete("{id}")]
   public async Task<IActionResult> Delete(Guid id)
   {
-    await service.Delete(id);
+    var ok = await service.Delete(id);
+    if (!ok) return NotFound();
     return NoContent();
   }
 }

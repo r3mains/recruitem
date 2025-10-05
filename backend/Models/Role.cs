@@ -1,15 +1,8 @@
-using System.ComponentModel.DataAnnotations;
+namespace Backend.Models;
 
-namespace recruitem_backend.Models
+public class Role
 {
-    public class Role
-    {
-        public Guid Id { get; set; }
-
-        [Required]
-        [MaxLength(50)]
-        public string RoleName { get; set; } = "";
-
-        public ICollection<User> Users { get; set; } = new List<User>();
-    }
+  public Guid Id { get; set; }
+  public string? Name { get; set; }
+  public ICollection<User> Users { get; set; } = [];
 }

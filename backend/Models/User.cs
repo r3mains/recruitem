@@ -1,28 +1,14 @@
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+namespace Backend.Models;
 
-namespace recruitem_backend.Models
+public class User
 {
-    public class User
-    {
-        public Guid Id { get; set; }
-
-        [Required]
-        [MaxLength(255)]
-        public string Email { get; set; } = "";
-
-        [Required]
-        public string Password { get; set; } = "";
-
-        [Required]
-        public Guid RoleId { get; set; }
-
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-
-        [ForeignKey("RoleId")]
-        public Role Role { get; set; } = null!;
-
-        public ICollection<Job> Jobs { get; set; } = new List<Job>();
-    }
+  public Guid Id { get; set; }
+  public string Email { get; set; } = string.Empty;
+  public string Password { get; set; } = string.Empty;
+  public Guid RoleId { get; set; }
+  public Role? Role { get; set; }
+  public DateTime? CreatedAt { get; set; }
+  public DateTime? UpdatedAt { get; set; }
+  public Candidate? Candidate { get; set; }
+  public Employee? Employee { get; set; }
 }

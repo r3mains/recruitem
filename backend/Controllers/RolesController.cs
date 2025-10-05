@@ -1,32 +1,19 @@
+using Backend.Dtos.Roles;
+using Backend.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using recruitem_backend.Data;
+using Microsoft.AspNetCore.Authorization;
 
-namespace recruitem_backend.Controllers
+namespace Backend.Controllers;
+
+[ApiController]
+[Route("api/roles")]
+public class RolesController(IRoleService service) : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class RolesController : ControllerBase
-    {
-        private readonly DatabaseContext _context;
-        private readonly ILogger<RolesController> _logger;
-
-        public RolesController(DatabaseContext context, ILogger<RolesController> logger)
-        {
-            _context = context;
-            _logger = logger;
-        }
-
-        [HttpGet]
-        public async Task<IActionResult> GetRoles()
-        {
-            _logger.LogInformation("Getting all roles");
-
-            var roles = await _context.Roles
-                .Select(r => new { r.Id, r.RoleName })
-                .ToListAsync();
-
-            return Ok(roles);
-        }
-    }
+  [HttpGet]
+  [AllowAnonymous]
+  public async Task<IActionResult> GetAll()
+  {
+    var data = await service.GetAll();
+    return Ok(data);
+  }
 }

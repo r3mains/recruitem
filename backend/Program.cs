@@ -1,83 +1,78 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Backend.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using recruitem_backend.Data;
-using recruitem_backend.Models;
-using System.Text;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Backend.Middlewares;
+using Backend.Repositories.Interfaces;
+using Backend.Repositories;
+using Serilog;
+using Backend.Services.Interfaces;
+using Backend.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Backend.Services.Auth;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
-builder.Logging.AddDebug();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
-builder.Services.AddControllers();
+builder.Host.UseSerilog((ctx, cfg) =>
+{
+  cfg.MinimumLevel.Information()
+     .Enrich.FromLogContext()
+     .WriteTo.Console();
+});
 
-builder.Services.AddExceptionHandler<recruitem_backend.Middleware.GlobalExceptionHandler>();
-builder.Services.AddProblemDetails();
-
+builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
-builder.Services.AddScoped<recruitem_backend.Services.IPasswordService, recruitem_backend.Services.PasswordService>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+builder.Services.AddScoped<ICandidateRepository, CandidateRepository>();
+builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+builder.Services.AddScoped<IJobRepository, JobRepository>();
 
-builder.Services.AddDbContext<DatabaseContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IRoleService, RoleService>();
+builder.Services.AddScoped<ICandidateService, CandidateService>();
+builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IJobService, JobService>();
 
-var jwtSecretKey = "YourSuperSecretKeyThatIsAtLeast32CharactersLongForMaximumSecurity!";
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey)),
-            ValidateIssuer = false,
-            ValidateAudience = false
-        };
-    });
+builder.Services.AddControllers();
 
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-    });
-});
+builder.Services
+  .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+  .AddJwtBearer(o => o.TokenValidationParameters = new TokenValidationParameters
+  {
+    ValidateIssuer = false,
+    ValidateAudience = false,
+    ValidateLifetime = true,
+    ValidateIssuerSigningKey = true,
+    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? "dev_secret_change_me"))
+  });
+
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+if (app.Environment.IsDevelopment())
 {
-    var context = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-
-    try
-    {
-        context.Database.Migrate();
-        logger.LogInformation("Database setup completed successfully");
-    }
-    catch (Exception ex)
-    {
-        logger.LogError($"Database setup failed: {ex.Message}");
-        try
-        {
-            context.Database.EnsureCreated();
-            logger.LogInformation("Database created successfully");
-        }
-        catch (Exception ex2)
-        {
-            logger.LogError($"Database creation also failed: {ex2.Message}");
-        }
-    }
+  app.UseSwagger();
+  app.UseSwaggerUI();
 }
 
-app.UseExceptionHandler();
-app.UseCors();
+app.UseSerilogRequestLogging();
+app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseHttpsRedirection();
+
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 app.Run();
