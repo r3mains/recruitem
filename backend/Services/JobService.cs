@@ -32,7 +32,7 @@ public class JobService(IJobRepository repo) : IJobService
       Title = dto.Title,
       Description = dto.Description,
       JobTypeId = dto.JobTypeId,
-      Location = dto.Location,
+      LocationId = dto.LocationId,
       SalaryMin = dto.SalaryMin,
       SalaryMax = dto.SalaryMax,
       PositionId = dto.PositionId,
@@ -51,7 +51,7 @@ public class JobService(IJobRepository repo) : IJobService
     if (!string.IsNullOrWhiteSpace(dto.Title)) e.Title = dto.Title;
     if (!string.IsNullOrWhiteSpace(dto.Description)) e.Description = dto.Description;
     if (dto.JobTypeId.HasValue) e.JobTypeId = dto.JobTypeId.Value;
-    if (dto.Location.HasValue) e.Location = dto.Location.Value;
+    if (dto.LocationId.HasValue) e.LocationId = dto.LocationId.Value;
     if (dto.SalaryMin.HasValue) e.SalaryMin = dto.SalaryMin;
     if (dto.SalaryMax.HasValue) e.SalaryMax = dto.SalaryMax;
     if (dto.PositionId.HasValue) e.PositionId = dto.PositionId.Value;
@@ -75,7 +75,7 @@ public class JobService(IJobRepository repo) : IJobService
     Title = e.Title,
     Description = e.Description,
     JobTypeId = e.JobTypeId,
-    Location = e.Location,
+    LocationId = e.LocationId,
     SalaryMin = e.SalaryMin,
     SalaryMax = e.SalaryMax,
     PositionId = e.PositionId,
