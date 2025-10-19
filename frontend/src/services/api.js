@@ -53,9 +53,125 @@ export const jobsAPI = {
 };
 
 export const positionsAPI = {
-  getAll: async () => {
-    const response = await api.get("/positions");
+  getAll: async (statusId) => {
+    const params = statusId ? `?statusId=${statusId}` : "";
+    const response = await api.get(`/positions${params}`);
     return response.data;
+  },
+
+  getById: async (id) => {
+    const response = await api.get(`/positions/${id}`);
+    return response.data;
+  },
+
+  create: async (positionData) => {
+    const response = await api.post("/positions", positionData);
+    return response.data;
+  },
+
+  update: async (id, positionData) => {
+    const response = await api.put(`/positions/${id}`, positionData);
+    return response.data;
+  },
+
+  updateStatus: async (id, statusData) => {
+    const response = await api.put(`/positions/${id}/status`, statusData);
+    return response.data;
+  },
+
+  delete: async (id) => {
+    await api.delete(`/positions/${id}`);
+  },
+};
+
+export const skillsAPI = {
+  getAll: async (search) => {
+    const params = search ? `?search=${search}` : "";
+    const response = await api.get(`/skills${params}`);
+    return response.data;
+  },
+
+  create: async (skillData) => {
+    const response = await api.post("/skills", skillData);
+    return response.data;
+  },
+
+  update: async (id, skillData) => {
+    const response = await api.put(`/skills/${id}`, skillData);
+    return response.data;
+  },
+
+  delete: async (id) => {
+    await api.delete(`/skills/${id}`);
+  },
+};
+
+export const employeesAPI = {
+  getAll: async () => {
+    const response = await api.get("/employees");
+    return response.data;
+  },
+};
+
+export const candidatesAPI = {
+  search: async (search, skills, page = 1, limit = 20) => {
+    const params = new URLSearchParams();
+    if (search) params.append("search", search);
+    if (skills) params.append("skills", skills);
+    params.append("page", page.toString());
+    params.append("limit", limit.toString());
+
+    const response = await api.get(`/candidates?${params}`);
+    return response.data;
+  },
+
+  getById: async (id) => {
+    const response = await api.get(`/candidates/${id}`);
+    return response.data;
+  },
+
+  getProfile: async () => {
+    const response = await api.get("/candidates/profile");
+    return response.data;
+  },
+
+  create: async (candidateData) => {
+    const response = await api.post("/candidates", candidateData);
+    return response.data;
+  },
+
+  update: async (id, candidateData) => {
+    const response = await api.put(`/candidates/${id}`, candidateData);
+    return response.data;
+  },
+
+  delete: async (id) => {
+    await api.delete(`/candidates/${id}`);
+  },
+
+  getSkills: async (candidateId) => {
+    const response = await api.get(`/candidates/${candidateId}/skills`);
+    return response.data;
+  },
+
+  addSkill: async (candidateId, skillData) => {
+    const response = await api.post(
+      `/candidates/${candidateId}/skills`,
+      skillData
+    );
+    return response.data;
+  },
+
+  updateSkill: async (candidateId, skillId, skillData) => {
+    const response = await api.put(
+      `/candidates/${candidateId}/skills/${skillId}`,
+      skillData
+    );
+    return response.data;
+  },
+
+  removeSkill: async (candidateId, skillId) => {
+    await api.delete(`/candidates/${candidateId}/skills/${skillId}`);
   },
 };
 
@@ -118,6 +234,52 @@ const getUserDetails = async () => {
   } catch (error) {
     return null;
   }
+};
+
+export const applicationsAPI = {
+  getAll: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.jobId) params.append("jobId", filters.jobId);
+    if (filters.candidateId) params.append("candidateId", filters.candidateId);
+    if (filters.statusId) params.append("statusId", filters.statusId);
+
+    const response = await api.get(`/jobapplications?${params.toString()}`);
+    return response.data;
+  },
+
+  getById: async (id) => {
+    const response = await api.get(`/jobapplications/${id}`);
+    return response.data;
+  },
+
+  create: async (data) => {
+    const response = await api.post("/jobapplications", data);
+    return response.data;
+  },
+
+  updateStatus: async (id, data) => {
+    const response = await api.put(`/jobapplications/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id) => {
+    await api.delete(`/jobapplications/${id}`);
+  },
+
+  getMyApplications: async () => {
+    const response = await api.get("/jobapplications/my-applications");
+    return response.data;
+  },
+
+  screen: async (id, data) => {
+    const response = await api.post(`/jobapplications/${id}/screen`, data);
+    return response.data;
+  },
+
+  getStatuses: async () => {
+    const response = await api.get("/lookups/status-types");
+    return response.data;
+  },
 };
 
 export default api;

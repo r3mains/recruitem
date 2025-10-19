@@ -1,25 +1,22 @@
 import React, { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
-const Login = ({ onLogin }) => {
+const Login = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    rememberMe: false,
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-
+  const { login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const from = location.state?.from?.pathname || "/welcome";
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: value,
     }));
 
     if (errors[name]) {
@@ -57,13 +54,9 @@ const Login = ({ onLogin }) => {
     setIsLoading(true);
 
     try {
-      const result = await onLogin(
-        formData.email,
-        formData.password,
-        formData.rememberMe
-      );
+      const result = await login(formData.email, formData.password);
       if (result.success) {
-        navigate(from, { replace: true });
+        navigate("/jobs");
       } else {
         setErrors({
           submit: result.error || "Login failed. Please try again.",
@@ -71,7 +64,7 @@ const Login = ({ onLogin }) => {
       }
     } catch (error) {
       setErrors({
-        submit: error.message || "Login failed. Please try again.",
+        submit: "Login failed. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -152,34 +145,6 @@ const Login = ({ onLogin }) => {
               {errors.password && (
                 <p className="mt-1 text-sm text-red-600">{errors.password}</p>
               )}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="rememberMe"
-                  name="rememberMe"
-                  type="checkbox"
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                  checked={formData.rememberMe}
-                  onChange={handleChange}
-                />
-                <label
-                  htmlFor="rememberMe"
-                  className="ml-2 block text-sm text-gray-900"
-                >
-                  Remember me
-                </label>
-              </div>
-
-              <div className="text-sm">
-                <Link
-                  to="/forgot-password"
-                  className="font-medium text-primary-600 hover:text-primary-500"
-                >
-                  Forgot your password?
-                </Link>
-              </div>
             </div>
           </div>
 

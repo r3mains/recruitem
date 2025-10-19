@@ -10,10 +10,17 @@ public class GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExcep
     }
     catch (Exception ex)
     {
-      logger.LogError(ex, "Unhandled exception");
+      logger.LogError(ex, "Unhandled exception occurred");
+
       context.Response.StatusCode = 500;
-      context.Response.ContentType = "text/plain";
-      await context.Response.WriteAsync("Something went wrong.");
+      context.Response.ContentType = "application/json";
+
+      await context.Response.WriteAsync($$"""
+        {
+          "message": "An error occurred while processing your request.",
+          "error": "{{ex.Message}}"
+        }
+        """);
     }
   }
 }

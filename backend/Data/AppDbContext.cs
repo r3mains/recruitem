@@ -22,6 +22,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
   public DbSet<JobSkill> JobSkills => Set<JobSkill>();
   public DbSet<PositionSkill> PositionSkills => Set<PositionSkill>();
   public DbSet<CandidateSkill> CandidateSkills => Set<CandidateSkill>();
+  public DbSet<Qualification> Qualifications => Set<Qualification>();
+  public DbSet<CandidateQualification> CandidateQualifications => Set<CandidateQualification>();
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
@@ -154,9 +156,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
       e.Property(x => x.Id).HasColumnName("id");
       e.Property(x => x.JobId).HasColumnName("job_id").IsRequired();
       e.Property(x => x.CandidateId).HasColumnName("candidate_id").IsRequired();
-      e.Property(x => x.AppliedAt).HasColumnName("applied_at").IsRequired();
       e.Property(x => x.StatusId).HasColumnName("status_id").IsRequired();
-      e.Property(x => x.CoverLetter).HasColumnName("cover_letter");
+      e.Property(x => x.CoverLetterUrl).HasColumnName("cover_letter_url");
+      e.Property(x => x.ResumeUrl).HasColumnName("resume_url");
+      e.Property(x => x.AppliedAt).HasColumnName("applied_at").IsRequired();
+      e.Property(x => x.LastUpdated).HasColumnName("last_updated");
       e.Property(x => x.Notes).HasColumnName("notes");
       e.Property(x => x.ReviewedAt).HasColumnName("reviewed_at");
       e.Property(x => x.ReviewedBy).HasColumnName("reviewed_by");
@@ -170,6 +174,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         .WithMany(c => c.JobApplications)
         .HasForeignKey(x => x.CandidateId)
         .OnDelete(DeleteBehavior.Cascade);
+
+      e.HasOne(x => x.Status)
+        .WithMany()
+        .HasForeignKey(x => x.StatusId)
+        .OnDelete(DeleteBehavior.Restrict);
     });
 
     modelBuilder.Entity<Position>(e =>
@@ -257,7 +266,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
       e.Property(x => x.Id).HasColumnName("id");
       e.Property(x => x.JobId).HasColumnName("job_id").IsRequired();
       e.Property(x => x.SkillId).HasColumnName("skill_id").IsRequired();
-      e.Property(x => x.Required).HasColumnName("required").IsRequired();
+      e.Property(x => x.IsRequired).HasColumnName("required").IsRequired();
+      e.Property(x => x.MinYearsExperience).HasColumnName("min_years_experience");
 
       e.HasOne(x => x.Job)
         .WithMany(j => j.JobSkills)
@@ -277,6 +287,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
       e.Property(x => x.Id).HasColumnName("id");
       e.Property(x => x.PositionId).HasColumnName("position_id").IsRequired();
       e.Property(x => x.SkillId).HasColumnName("skill_id").IsRequired();
+      e.Property(x => x.IsRequired).HasColumnName("is_required").IsRequired();
+      e.Property(x => x.MinYearsExperience).HasColumnName("min_years_experience");
 
       e.HasOne(x => x.Position)
         .WithMany(p => p.PositionSkills)
@@ -296,7 +308,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
       e.Property(x => x.Id).HasColumnName("id");
       e.Property(x => x.CandidateId).HasColumnName("candidate_id").IsRequired();
       e.Property(x => x.SkillId).HasColumnName("skill_id").IsRequired();
-      e.Property(x => x.YearOfExperience).HasColumnName("year_of_experience");
+      e.Property(x => x.YearsOfExperience).HasColumnName("year_of_experience");
 
       e.HasOne(x => x.Candidate)
         .WithMany(c => c.CandidateSkills)
@@ -306,6 +318,35 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
       e.HasOne(x => x.Skill)
         .WithMany(s => s.CandidateSkills)
         .HasForeignKey(x => x.SkillId)
+        .OnDelete(DeleteBehavior.Cascade);
+    });
+
+    modelBuilder.Entity<Qualification>(e =>
+    {
+      e.ToTable("qualifications");
+      e.HasKey(x => x.Id);
+      e.Property(x => x.Id).HasColumnName("id");
+      e.Property(x => x.Name).HasColumnName("qualification");
+    });
+
+    modelBuilder.Entity<CandidateQualification>(e =>
+    {
+      e.ToTable("candidate_qualifications");
+      e.HasKey(x => x.Id);
+      e.Property(x => x.Id).HasColumnName("id");
+      e.Property(x => x.CandidateId).HasColumnName("candidate_id").IsRequired();
+      e.Property(x => x.QualificationId).HasColumnName("qualification_id").IsRequired();
+      e.Property(x => x.YearCompleted).HasColumnName("year_completed");
+      e.Property(x => x.Grade).HasColumnName("grade");
+
+      e.HasOne(x => x.Candidate)
+        .WithMany(c => c.CandidateQualifications)
+        .HasForeignKey(x => x.CandidateId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+      e.HasOne(x => x.Qualification)
+        .WithMany(q => q.CandidateQualifications)
+        .HasForeignKey(x => x.QualificationId)
         .OnDelete(DeleteBehavior.Cascade);
     });
   }

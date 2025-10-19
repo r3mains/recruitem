@@ -10,6 +10,13 @@ namespace Backend.Controllers;
 [Authorize]
 public class EmployeesController(IEmployeeService service) : ControllerBase
 {
+  [HttpGet]
+  public async Task<IActionResult> GetAll()
+  {
+    var employees = await service.GetAll();
+    return Ok(employees);
+  }
+
   [HttpGet("{id}")]
   public async Task<IActionResult> GetById(Guid id)
   {

@@ -13,4 +13,5 @@ public class Candidate
   public Address? Address { get; set; }
   public ICollection<JobApplication> JobApplications { get; set; } = [];
   public ICollection<CandidateSkill> CandidateSkills { get; set; } = [];
+  public ICollection<CandidateQualification> CandidateQualifications { get; set; } = [];
 }
