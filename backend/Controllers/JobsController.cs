@@ -28,6 +28,7 @@ public class JobsController(IJobService service) : ControllerBase
   }
 
   [HttpGet]
+  [Authorize]
   public async Task<IActionResult> GetAll([FromQuery] Guid? recruiterId, [FromQuery] Guid? statusId, [FromQuery] Guid? positionId)
   {
     var data = await service.GetAll(recruiterId, statusId, positionId);
@@ -35,6 +36,7 @@ public class JobsController(IJobService service) : ControllerBase
   }
 
   [HttpGet("{id}")]
+  [Authorize]
   public async Task<IActionResult> GetById(Guid id)
   {
     var job = await service.GetById(id);
@@ -42,6 +44,7 @@ public class JobsController(IJobService service) : ControllerBase
   }
 
   [HttpPost]
+  [Authorize(Policy = "RecruiterOrHR")]
   public async Task<IActionResult> Create(JobCreateDto dto)
   {
     var job = await service.Create(dto);
@@ -49,7 +52,7 @@ public class JobsController(IJobService service) : ControllerBase
   }
 
   [HttpPut("{id}")]
-  [Authorize]
+  [Authorize(Policy = "RecruiterOrHR")]
   public async Task<IActionResult> Update(Guid id, JobUpdateDto dto)
   {
     var job = await service.Update(id, dto);
@@ -57,7 +60,7 @@ public class JobsController(IJobService service) : ControllerBase
   }
 
   [HttpDelete("{id}")]
-  [Authorize]
+  [Authorize(Policy = "AdminOnly")]
   public async Task<IActionResult> Delete(Guid id)
   {
     await service.Delete(id);

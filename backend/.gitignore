@@ -2,3 +2,6 @@ bin/
 obj/
 .vs/
 .env
+appsettings.Development.json
+appsettings.json
+.env.example

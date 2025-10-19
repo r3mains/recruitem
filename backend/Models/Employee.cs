@@ -13,4 +13,7 @@ public class Employee
   public Address? BranchAddress { get; set; }
   public ICollection<Job> RecruitedJobs { get; set; } = [];
   public ICollection<Position> ReviewedPositions { get; set; } = [];
+
+  public string? FirstName => FullName?.Split(' ').FirstOrDefault();
+  public string? LastName => FullName?.Split(' ').Skip(1).FirstOrDefault();
 }

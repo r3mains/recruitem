@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useApi } from "../contexts/ApiContext";
 
 const JobApplications = () => {
-  const { jobApplications, lookups } = useApi();
+  const { applications: jobApplications, lookups } = useApi();
   const [applications, setApplications] = useState([]);
   const [statusTypes, setStatusTypes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,7 +13,7 @@ const JobApplications = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [jobApplications, lookups]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = async () => {
     try {
@@ -21,7 +21,7 @@ const JobApplications = () => {
       setError(null);
 
       const [applicationsData, statusTypesData] = await Promise.all([
-        jobApplications.getAll(filters),
+        jobApplications.getMyApplications(),
         lookups.getStatusTypes(),
       ]);
 
@@ -29,7 +29,8 @@ const JobApplications = () => {
       setStatusTypes(
         statusTypesData.filter((st) => st.context === "application")
       );
-    } catch {
+    } catch (err) {
+      console.error("Error loading data:", err);
       setError("Failed to load data");
     } finally {
       setLoading(false);
@@ -52,6 +53,7 @@ const JobApplications = () => {
       await jobApplications.update(applicationId, { statusId });
       loadData();
     } catch (err) {
+      console.error("Error updating application status:", err);
       setError("Failed to update application status");
     }
   };

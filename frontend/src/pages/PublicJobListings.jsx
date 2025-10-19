@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { useApi } from "../contexts/ApiContext";
+import JobApplicationForm from "../components/JobApplicationForm";
+import LoadingSpinner from "../components/LoadingSpinner";
+import ErrorMessage from "../components/ErrorMessage";
 
 const PublicJobListings = () => {
+  const { user } = useAuth();
+  const api = useApi();
   const [jobs, setJobs] = useState([]);
   const [jobTypes, setJobTypes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -9,6 +16,8 @@ const PublicJobListings = () => {
   const [filters, setFilters] = useState({
     jobTypeId: "",
   });
+  const [showApplicationForm, setShowApplicationForm] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -67,27 +76,37 @@ const PublicJobListings = () => {
     return jobType ? jobType.type : "Unknown";
   };
 
+  const handleApplyClick = (job) => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    setSelectedJob(job);
+    setShowApplicationForm(true);
+  };
+
+  const handleApplicationSuccess = () => {
+    setShowApplicationForm(false);
+    setSelectedJob(null);
+    alert("Application submitted successfully!");
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+        <LoadingSpinner size="large" text="Loading jobs..." />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg max-w-md">
-          <h3 className="font-medium mb-2">Error Loading Jobs</h3>
-          <p>{error}</p>
-          <button
-            onClick={loadData}
-            className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-          >
-            Retry
-          </button>
-        </div>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <ErrorMessage
+          message={error}
+          onRetry={loadData}
+          title="Error Loading Jobs"
+        />
       </div>
     );
   }
@@ -134,7 +153,7 @@ const PublicJobListings = () => {
               onClick={() => navigate("/login")}
               className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              Login to Apply
+              {user ? "Logged in" : "Login to Apply"}
             </button>
           </div>
         </div>
@@ -187,16 +206,27 @@ const PublicJobListings = () => {
                     View Details
                   </button>
                   <button
-                    onClick={() => navigate("/login")}
+                    onClick={() => handleApplyClick(job)}
                     className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
-                    Apply Now
+                    {user ? "Apply Now" : "Login to Apply"}
                   </button>
                 </div>
               </div>
             ))
           )}
         </div>
+
+        {showApplicationForm && selectedJob && (
+          <JobApplicationForm
+            job={selectedJob}
+            onClose={() => {
+              setShowApplicationForm(false);
+              setSelectedJob(null);
+            }}
+            onSuccess={handleApplicationSuccess}
+          />
+        )}
       </div>
     </div>
   );

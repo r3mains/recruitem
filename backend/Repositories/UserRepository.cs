@@ -11,12 +11,18 @@ public class UserRepository(AppDbContext db) : IUserRepository
 
   public async Task<User?> GetById(Guid id)
   {
-    return await _db.Users.FirstOrDefaultAsync(x => x.Id == id);
+    return await _db.Users
+        .Include(u => u.Role)
+        .Include(u => u.Candidate)
+        .Include(u => u.Employee)
+        .FirstOrDefaultAsync(x => x.Id == id);
   }
 
   public async Task<List<User>> GetAll()
   {
-    return await _db.Users.ToListAsync();
+    return await _db.Users
+        .Include(u => u.Role)
+        .ToListAsync();
   }
 
   public async Task Add(User entity)

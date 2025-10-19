@@ -1,14 +1,16 @@
 using Backend.Dtos.Users;
 using Backend.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers;
 
 [ApiController]
 [Route("api/users")]
-public class UsersController(IUserService service) : ControllerBase
+public class UsersController(IUserService service) : BaseController
 {
   [HttpGet]
+  [Authorize(Policy = "AdminOnly")]
   public async Task<ActionResult<List<UserDto>>> GetAll()
   {
     var data = await service.GetAll();
@@ -16,6 +18,7 @@ public class UsersController(IUserService service) : ControllerBase
   }
 
   [HttpGet("{id}")]
+  [Authorize]
   public async Task<ActionResult<UserDto>> GetById(Guid id)
   {
     var r = await service.GetById(id);
@@ -23,7 +26,20 @@ public class UsersController(IUserService service) : ControllerBase
     return Ok(r);
   }
 
+  [HttpGet("me")]
+  [Authorize]
+  public async Task<ActionResult<UserDto>> GetCurrentUser()
+  {
+    var currentUserId = GetCurrentUserId();
+    if (currentUserId == null) return Unauthorized();
+
+    var r = await service.GetById(currentUserId.Value);
+    if (r == null) return NotFound();
+    return Ok(r);
+  }
+
   [HttpPost]
+  [Authorize(Policy = "AdminOnly")]
   public async Task<ActionResult<UserDto>> Create(UserCreateDto dto)
   {
     var r = await service.Create(dto);
@@ -31,6 +47,7 @@ public class UsersController(IUserService service) : ControllerBase
   }
 
   [HttpPut("{id}")]
+  [Authorize]
   public async Task<ActionResult<UserDto>> Update(Guid id, UserUpdateDto dto)
   {
     var r = await service.Update(id, dto);
@@ -39,6 +56,7 @@ public class UsersController(IUserService service) : ControllerBase
   }
 
   [HttpDelete("{id}")]
+  [Authorize(Policy = "AdminOnly")]
   public async Task<IActionResult> Delete(Guid id)
   {
     var ok = await service.Delete(id);

@@ -19,7 +19,9 @@ public class AuthService(IUserRepository userRepo, IConfiguration config) : IAut
     var user = users.FirstOrDefault(u => u.Email == dto.Email);
     if (user == null) return null;
     if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.Password)) return null;
-    return GenerateToken(user);
+
+    var userWithRelations = await userRepo.GetById(user.Id);
+    return GenerateToken(userWithRelations!);
   }
 
   public async Task<AuthResponseDto> Register(RegisterRequestDto dto)
@@ -40,8 +42,19 @@ public class AuthService(IUserRepository userRepo, IConfiguration config) : IAut
     var claims = new List<Claim>
     {
       new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-  new(JwtRegisteredClaimNames.Email, user.Email)
+      new(JwtRegisteredClaimNames.Email, user.Email),
+      new("role", user.Role?.Name ?? "Unknown")
     };
+
+    if (user.Candidate != null)
+    {
+      claims.Add(new("CandidateId", user.Candidate.Id.ToString()));
+    }
+
+    if (user.Employee != null)
+    {
+      claims.Add(new("EmployeeId", user.Employee.Id.ToString()));
+    }
 
     var creds = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)), SecurityAlgorithms.HmacSha256);
     var token = new JwtSecurityToken(

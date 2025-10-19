@@ -13,4 +13,8 @@ public class Address
   public ICollection<Job> Jobs { get; set; } = [];
   public ICollection<Candidate> Candidates { get; set; } = [];
   public ICollection<Employee> Employees { get; set; } = [];
+
+  public string? Street => AddressLine1;
+  public string? State => City?.State?.Name;
+  public string? ZipCode => Pincode;
 }
