@@ -2,43 +2,56 @@ using Backend.Dtos.Roles;
 using Backend.Models;
 using Backend.Repositories.Interfaces;
 using Backend.Services.Interfaces;
+using AutoMapper;
 
 namespace Backend.Services;
 
-public class RoleService(IRoleRepository repo) : IRoleService
+public class RoleService : IRoleService
 {
+  private readonly IRoleRepository _repo;
+  private readonly IMapper _mapper;
+
+  public RoleService(IRoleRepository repo, IMapper mapper)
+  {
+    _repo = repo;
+    _mapper = mapper;
+  }
+
   public async Task<RoleDto?> GetById(Guid id)
   {
-    var e = await repo.GetById(id);
-    if (e == null) return null;
-    return new RoleDto { Id = e.Id, Name = e.Name };
+    var role = await _repo.GetById(id);
+    return role == null ? null : _mapper.Map<RoleDto>(role);
   }
 
   public async Task<List<RoleDto>> GetAll()
   {
-    var list = await repo.GetAll();
-    return list.Select(e => new RoleDto { Id = e.Id, Name = e.Name }).ToList();
+    var roles = await _repo.GetAll();
+    return _mapper.Map<List<RoleDto>>(roles);
   }
 
   public async Task<RoleDto> Create(RoleCreateDto dto)
   {
-    var e = new Role { Id = Guid.NewGuid(), Name = dto.Name };
-    await repo.Add(e);
-    return new RoleDto { Id = e.Id, Name = e.Name };
+    var role = _mapper.Map<Role>(dto);
+    role.Id = Guid.NewGuid();
+
+    await _repo.Add(role);
+    return _mapper.Map<RoleDto>(role);
   }
 
   public async Task<RoleDto?> Update(Guid id, RoleUpdateDto dto)
   {
-    var e = await repo.GetById(id);
-    if (e == null) return null;
-    if (!string.IsNullOrWhiteSpace(dto.Name)) e.Name = dto.Name;
-    await repo.Update(e);
-    return new RoleDto { Id = e.Id, Name = e.Name };
+    var role = await _repo.GetById(id);
+    if (role == null) return null;
+
+    _mapper.Map(dto, role);
+    await _repo.Update(role);
+
+    return _mapper.Map<RoleDto>(role);
   }
 
   public async Task<bool> Delete(Guid id)
   {
-    await repo.DeleteById(id);
+    await _repo.DeleteById(id);
     return true;
   }
 }

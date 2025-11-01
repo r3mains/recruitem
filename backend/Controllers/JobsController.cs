@@ -7,7 +7,7 @@ namespace Backend.Controllers;
 
 [ApiController]
 [Route("api/jobs")]
-public class JobsController(IJobService service) : ControllerBase
+public class JobsController(IJobService service) : BaseController
 {
   [HttpGet("public")]
   [AllowAnonymous]
@@ -24,7 +24,7 @@ public class JobsController(IJobService service) : ControllerBase
   public async Task<IActionResult> GetPublicJobById(Guid id)
   {
     var job = await service.GetById(id);
-    return job == null ? NotFound() : Ok(job);
+    return NotFoundIfNull(job);
   }
 
   [HttpGet]
@@ -40,7 +40,7 @@ public class JobsController(IJobService service) : ControllerBase
   public async Task<IActionResult> GetById(Guid id)
   {
     var job = await service.GetById(id);
-    return job == null ? NotFound() : Ok(job);
+    return NotFoundIfNull(job);
   }
 
   [HttpPost]
@@ -56,7 +56,7 @@ public class JobsController(IJobService service) : ControllerBase
   public async Task<IActionResult> Update(Guid id, JobUpdateDto dto)
   {
     var job = await service.Update(id, dto);
-    return job == null ? NotFound() : Ok(job);
+    return NotFoundIfNull(job);
   }
 
   [HttpDelete("{id}")]
