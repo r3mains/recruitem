@@ -32,6 +32,8 @@ builder.Services.AddScoped<IJobService, JobService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<ILookupService, LookupService>();
+builder.Services.AddScoped<IPositionService, PositionService>();
 builder.Services.AddScoped<JobApplicationService>();
 
 builder.Services.AddScoped<ICandidateRepository, CandidateRepository>();

@@ -6,38 +6,66 @@ using Backend.Dtos.Auth;
 using Backend.Models;
 using Backend.Repositories.Interfaces;
 using Backend.Services.Interfaces;
+using Backend.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.EntityFrameworkCore;
+using AutoMapper;
 
 namespace Backend.Services.Auth;
 
-public class AuthService(IUserRepository userRepo, IConfiguration config) : IAuthService
+public class AuthService : IAuthService
 {
+  private readonly IUserRepository _userRepo;
+  private readonly IConfiguration _config;
+  private readonly AppDbContext _context;
+  private readonly IMapper _mapper;
+
+  public AuthService(IUserRepository userRepo, IConfiguration config, AppDbContext context, IMapper mapper)
+  {
+    _userRepo = userRepo;
+    _config = config;
+    _context = context;
+    _mapper = mapper;
+  }
+
   public async Task<AuthResponseDto?> Login(LoginRequestDto dto)
   {
-    var users = await userRepo.GetAll();
-    var user = users.FirstOrDefault(u => u.Email == dto.Email);
+    var user = await _context.Users
+        .Include(u => u.Role)
+        .Include(u => u.Candidate)
+        .Include(u => u.Employee)
+        .FirstOrDefaultAsync(u => u.Email == dto.Email);
+
     if (user == null) return null;
     if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.Password)) return null;
 
-    var userWithRelations = await userRepo.GetById(user.Id);
-    return GenerateToken(userWithRelations!);
+    return GenerateToken(user);
   }
 
   public async Task<AuthResponseDto> Register(RegisterRequestDto dto)
   {
-    var existing = (await userRepo.GetAll()).Any(u => u.Email == dto.Email);
+    var existing = await _context.Users.AnyAsync(u => u.Email == dto.Email);
     if (existing) throw new Exception("Email already used");
 
-    var hash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
-    var user = new User { Id = Guid.NewGuid(), Email = dto.Email, Password = hash, RoleId = dto.RoleId, CreatedAt = DateTime.UtcNow };
-    await userRepo.Add(user);
-    return GenerateToken(user);
+    var user = _mapper.Map<User>(dto);
+    user.Id = Guid.NewGuid();
+
+    await _userRepo.Add(user);
+
+    // Load the user with relations for token generation
+    var userWithRelations = await _context.Users
+        .Include(u => u.Role)
+        .Include(u => u.Candidate)
+        .Include(u => u.Employee)
+        .FirstAsync(u => u.Id == user.Id);
+
+    return GenerateToken(userWithRelations);
   }
 
   private AuthResponseDto GenerateToken(User user)
   {
-    var key = config["Jwt:Key"] ?? throw new Exception("Jwt:Key missing");
+    var key = _config["Jwt:Key"] ?? throw new Exception("Jwt:Key missing");
 
     var claims = new List<Claim>
     {

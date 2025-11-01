@@ -7,12 +7,17 @@ public class JobDto
   public string Title { get; set; } = string.Empty;
   public string Description { get; set; } = string.Empty;
   public Guid JobTypeId { get; set; }
+  public string? JobTypeName { get; set; }
   public Guid LocationId { get; set; }
+  public string? LocationDetails { get; set; }
   public decimal? SalaryMin { get; set; }
   public decimal? SalaryMax { get; set; }
   public Guid PositionId { get; set; }
+  public string? PositionName { get; set; }
   public Guid StatusId { get; set; }
+  public string? StatusName { get; set; }
   public string? ClosedReason { get; set; }
+  public string? RecruiterName { get; set; }
   public DateTime? CreatedAt { get; set; }
   public DateTime? UpdatedAt { get; set; }
 }

@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Backend.Dtos.Positions;
-using Backend.Models;
-using Backend.Data;
-using Microsoft.EntityFrameworkCore;
+using Backend.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Backend.Controllers;
@@ -10,165 +8,59 @@ namespace Backend.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class PositionsController : ControllerBase
+public class PositionsController : BaseController
 {
-  private readonly AppDbContext _context;
+  private readonly IPositionService _positionService;
 
-  public PositionsController(AppDbContext context)
+  public PositionsController(IPositionService positionService)
   {
-    _context = context;
+    _positionService = positionService;
   }
 
   [HttpGet]
-  public async Task<ActionResult<IEnumerable<PositionDto>>> GetAll([FromQuery] Guid? statusId)
+  public async Task<ActionResult<IEnumerable<PositionDto>>> GetAll()
   {
-    var query = _context.Positions.AsQueryable();
-
-    if (statusId.HasValue)
-    {
-      query = query.Where(p => p.StatusId == statusId);
-    }
-
-    var positions = await query
-        .Include(p => p.Status)
-        .Include(p => p.Reviewer)
-        .Select(p => new PositionDto
-        {
-          Id = p.Id,
-          Title = p.Title,
-          StatusId = p.StatusId,
-          StatusName = p.Status!.Name,
-          ClosedReason = p.ClosedReason,
-          NumberOfInterviews = p.NumberOfInterviews,
-          ReviewerId = p.ReviewerId,
-          ReviewerName = p.Reviewer != null ? p.Reviewer.FirstName + " " + p.Reviewer.LastName : null
-        })
-        .ToListAsync();
-
+    var positions = await _positionService.GetAll();
     return Ok(positions);
   }
 
   [HttpGet("{id}")]
-  public async Task<ActionResult<PositionDto>> GetById(Guid id)
+  public async Task<IActionResult> GetById(Guid id)
   {
-    var position = await _context.Positions
-        .Include(p => p.Status)
-        .Include(p => p.Reviewer)
-        .Where(p => p.Id == id)
-        .Select(p => new PositionDto
-        {
-          Id = p.Id,
-          Title = p.Title,
-          StatusId = p.StatusId,
-          StatusName = p.Status!.Name,
-          ClosedReason = p.ClosedReason,
-          NumberOfInterviews = p.NumberOfInterviews,
-          ReviewerId = p.ReviewerId,
-          ReviewerName = p.Reviewer != null ? p.Reviewer.FirstName + " " + p.Reviewer.LastName : null
-        })
-        .FirstOrDefaultAsync();
-
-    if (position == null)
-      return NotFound();
-
-    return Ok(position);
+    var position = await _positionService.GetById(id);
+    return NotFoundIfNull(position);
   }
 
   [HttpPost]
   [Authorize(Policy = "RecruiterOrHR")]
   public async Task<ActionResult<PositionDto>> Create(PositionCreateDto dto)
   {
-    var position = new Position
-    {
-      Id = Guid.NewGuid(),
-      Title = dto.Title,
-      StatusId = dto.StatusId,
-      ClosedReason = dto.ClosedReason,
-      NumberOfInterviews = dto.NumberOfInterviews,
-      ReviewerId = dto.ReviewerId
-    };
-
-    _context.Positions.Add(position);
-    await _context.SaveChangesAsync();
-
-    return CreatedAtAction(nameof(GetById), new { id = position.Id }, await GetPositionDto(position.Id));
+    var position = await _positionService.Create(dto);
+    return CreatedAtAction(nameof(GetById), new { id = position.Id }, position);
   }
 
   [HttpPut("{id}")]
   [Authorize(Policy = "RecruiterOrHR")]
-  public async Task<ActionResult<PositionDto>> Update(Guid id, PositionUpdateDto dto)
+  public async Task<IActionResult> Update(Guid id, PositionUpdateDto dto)
   {
-    var position = await _context.Positions.FindAsync(id);
-    if (position == null)
-      return NotFound();
-
-    if (!string.IsNullOrEmpty(dto.Title))
-      position.Title = dto.Title;
-
-    if (dto.StatusId.HasValue)
-      position.StatusId = dto.StatusId.Value;
-
-    if (dto.ClosedReason != null)
-      position.ClosedReason = dto.ClosedReason;
-
-    if (dto.NumberOfInterviews.HasValue)
-      position.NumberOfInterviews = dto.NumberOfInterviews.Value;
-
-    if (dto.ReviewerId.HasValue)
-      position.ReviewerId = dto.ReviewerId.Value;
-
-    await _context.SaveChangesAsync();
-
-    return Ok(await GetPositionDto(id));
+    var position = await _positionService.Update(id, dto);
+    return NotFoundIfNull(position);
   }
 
   [HttpPut("{id}/status")]
   [Authorize(Policy = "RecruiterOrHR")]
-  public async Task<ActionResult<PositionDto>> UpdateStatus(Guid id, PositionStatusUpdateDto dto)
+  public async Task<IActionResult> UpdateStatus(Guid id, PositionStatusUpdateDto dto)
   {
-    var position = await _context.Positions.FindAsync(id);
-    if (position == null)
-      return NotFound();
-
-    position.StatusId = dto.StatusId;
-    position.ClosedReason = dto.ClosedReason;
-
-    await _context.SaveChangesAsync();
-
-    return Ok(await GetPositionDto(id));
+    var position = await _positionService.UpdateStatus(id, dto);
+    return NotFoundIfNull(position);
   }
 
   [HttpDelete("{id}")]
   [Authorize(Policy = "AdminOnly")]
   public async Task<IActionResult> Delete(Guid id)
   {
-    var position = await _context.Positions.FindAsync(id);
-    if (position == null)
-      return NotFound();
-
-    _context.Positions.Remove(position);
-    await _context.SaveChangesAsync();
-
+    var success = await _positionService.Delete(id);
+    if (!success) return NotFound();
     return NoContent();
-  }
-
-  private async Task<PositionDto> GetPositionDto(Guid id)
-  {
-    return await _context.Positions
-        .Include(p => p.Status)
-        .Include(p => p.Reviewer)
-        .Where(p => p.Id == id)
-        .Select(p => new PositionDto
-        {
-          Id = p.Id,
-          Title = p.Title,
-          StatusId = p.StatusId,
-          StatusName = p.Status!.Name,
-          ClosedReason = p.ClosedReason,
-          NumberOfInterviews = p.NumberOfInterviews,
-          ReviewerId = p.ReviewerId,
-          ReviewerName = p.Reviewer != null ? p.Reviewer.FirstName + " " + p.Reviewer.LastName : null
-        })
-        .FirstAsync();
   }
 }
