@@ -282,4 +282,53 @@ export const applicationsAPI = {
   },
 };
 
+export const screeningAPI = {
+  getApplicationsForScreening: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.jobId) params.append("jobId", filters.jobId);
+    if (filters.statusId) params.append("statusId", filters.statusId);
+
+    const response = await api.get(`/screening/applications?${params.toString()}`);
+    return response.data;
+  },
+
+  screenApplication: async (applicationId, data) => {
+    const response = await api.post(`/screening/screen/${applicationId}`, data);
+    return response.data;
+  },
+
+  bulkScreenApplications: async (data) => {
+    const response = await api.post("/screening/bulk-screen", data);
+    return response.data;
+  },
+
+  shortlistApplications: async (data) => {
+    const response = await api.post("/screening/shortlist", data);
+    return response.data;
+  },
+
+  getShortlistedApplications: async (jobId = null) => {
+    const params = new URLSearchParams();
+    if (jobId) params.append("jobId", jobId);
+
+    const response = await api.get(`/screening/shortlisted?${params.toString()}`);
+    return response.data;
+  },
+
+  calculateScore: async (applicationId) => {
+    const response = await api.get(`/screening/calculate-score/${applicationId}`);
+    return response.data;
+  },
+
+  getApplicationsByScoreRange: async (jobId, minScore, maxScore) => {
+    const params = new URLSearchParams();
+    params.append("jobId", jobId);
+    params.append("minScore", minScore);
+    params.append("maxScore", maxScore);
+
+    const response = await api.get(`/screening/by-score-range?${params.toString()}`);
+    return response.data;
+  },
+};
+
 export default api;

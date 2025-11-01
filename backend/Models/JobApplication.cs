@@ -8,6 +8,7 @@ public class JobApplication
   public Guid StatusId { get; set; }
   public string? CoverLetterUrl { get; set; }
   public string? ResumeUrl { get; set; }
+  public double? Score { get; set; }
   public DateTime AppliedAt { get; set; }
   public DateTime? LastUpdated { get; set; }
 

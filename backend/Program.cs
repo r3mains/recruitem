@@ -1,6 +1,7 @@
 using Backend.Data;
 using Backend.Middlewares;
 using Backend.Models;
+using Backend.Extensions;
 using Microsoft.EntityFrameworkCore;
 using FluentValidation;
 using FluentValidation.AspNetCore;
@@ -34,6 +35,7 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<ILookupService, LookupService>();
 builder.Services.AddScoped<IPositionService, PositionService>();
+builder.Services.AddScoped<IScreeningService, ScreeningService>();
 builder.Services.AddScoped<JobApplicationService>();
 
 builder.Services.AddScoped<ICandidateRepository, CandidateRepository>();
@@ -101,5 +103,12 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// Seed data
+using (var scope = app.Services.CreateScope())
+{
+  var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+  await context.SeedStatusTypesAsync();
+}
 
 app.Run();

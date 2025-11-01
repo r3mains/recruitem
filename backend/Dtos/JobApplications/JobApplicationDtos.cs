@@ -10,10 +10,13 @@ public class JobApplicationDto
   public string CandidateEmail { get; set; } = string.Empty;
   public DateTime AppliedAt { get; set; }
   public Guid StatusId { get; set; }
+  public string StatusName { get; set; } = string.Empty;
   public string? CoverLetter { get; set; }
   public string? Notes { get; set; }
+  public double? Score { get; set; }
   public DateTime? ReviewedAt { get; set; }
   public Guid? ReviewedBy { get; set; }
+  public string? ReviewerName { get; set; }
 }
 
 public class JobApplicationCreateDto
@@ -27,4 +30,28 @@ public class JobApplicationUpdateDto
 {
   public Guid StatusId { get; set; }
   public string? Notes { get; set; }
+  public double? Score { get; set; }
+}
+
+public class ScreeningDto
+{
+  public Guid StatusId { get; set; }
+  public string? Notes { get; set; }
+  public double? Score { get; set; }
+}
+
+public class ShortlistingDto
+{
+  public List<Guid> ApplicationIds { get; set; } = [];
+  public Guid StatusId { get; set; }
+  public string? Notes { get; set; }
+}
+
+public class BulkScreeningDto
+{
+  public List<Guid> ApplicationIds { get; set; } = [];
+  public Guid StatusId { get; set; }
+  public string? Notes { get; set; }
+  public double? MinScore { get; set; }
+  public double? MaxScore { get; set; }
 }

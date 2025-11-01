@@ -11,6 +11,7 @@ import {
   employeesAPI,
   candidatesAPI,
   applicationsAPI,
+  screeningAPI,
 } from "../services/api";
 
 const ApiContext = createContext();
@@ -36,6 +37,7 @@ export const ApiProvider = ({ children }) => {
     employees: employeesAPI,
     candidates: candidatesAPI,
     applications: applicationsAPI,
+    screening: screeningAPI,
   };
 
   return <ApiContext.Provider value={api}>{children}</ApiContext.Provider>;

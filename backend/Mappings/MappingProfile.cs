@@ -21,7 +21,12 @@ public class MappingProfile : Profile
     CreateMap<JobApplication, JobApplicationDto>()
         .ForMember(dest => dest.JobTitle, opt => opt.MapFrom(src => src.Job!.Title))
         .ForMember(dest => dest.CandidateName, opt => opt.MapFrom(src => src.Candidate!.FullName ?? "Unknown"))
-        .ForMember(dest => dest.CandidateEmail, opt => opt.MapFrom(src => src.Candidate!.User!.Email));
+        .ForMember(dest => dest.CandidateEmail, opt => opt.MapFrom(src => src.Candidate!.User!.Email))
+        .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => src.Status!.Status))
+        .ForMember(dest => dest.ReviewerName, opt => opt.MapFrom(src => 
+            src.ReviewedBy != null 
+                ? src.Job!.Recruiter!.FullName ?? "Unknown" 
+                : null));
 
     CreateMap<JobApplicationCreateDto, JobApplication>()
         .ForMember(dest => dest.Id, opt => opt.Ignore())

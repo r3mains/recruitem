@@ -16,7 +16,7 @@ import JobApplications from "./pages/JobApplications";
 import PositionsPage from "./pages/PositionsPage";
 import CandidatesPage from "./pages/CandidatesPage";
 import CandidateProfilePage from "./pages/CandidateProfilePage";
-import ApplicationsPage from "./pages/ApplicationsPage";
+import ScreeningPage from "./pages/ScreeningPage";
 
 function App() {
   return (
@@ -107,7 +107,7 @@ function App() {
                       "Reviewer",
                     ]}
                   >
-                    <ApplicationsPage />
+                    <ScreeningPage />
                   </ProtectedRoute>
                 }
               />
