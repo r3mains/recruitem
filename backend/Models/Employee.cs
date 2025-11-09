@@ -1,4 +1,4 @@
-namespace Backend.Models;
+namespace backend.Models;
 
 public class Employee
 {
@@ -8,12 +8,15 @@ public class Employee
   public Guid? BranchAddressId { get; set; }
   public DateOnly? JoiningDate { get; set; }
   public string? OfferLetterUrl { get; set; }
+  public DateTime CreatedAt { get; set; }
+  public DateTime UpdatedAt { get; set; }
+  public bool IsDeleted { get; set; } = false;
 
-  public User? User { get; set; }
+  // Navigation properties
+  public User User { get; set; } = null!;
   public Address? BranchAddress { get; set; }
-  public ICollection<Job> RecruitedJobs { get; set; } = [];
-  public ICollection<Position> ReviewedPositions { get; set; } = [];
-
-  public string? FirstName => FullName?.Split(' ').FirstOrDefault();
-  public string? LastName => FullName?.Split(' ').Skip(1).FirstOrDefault();
+  public virtual ICollection<Position> ReviewedPositions { get; set; } = [];
+  public virtual ICollection<Job> RecruitedJobs { get; set; } = [];
+  public ICollection<Comment> Comments { get; set; } = new List<Comment>();
+  public ICollection<Verification> Verifications { get; set; } = new List<Verification>();
 }

@@ -1,181 +1,285 @@
 using AutoMapper;
-using Backend.Dtos.JobApplications;
-using Backend.Dtos.Candidates;
-using Backend.Dtos.Jobs;
-using Backend.Dtos.Users;
-using Backend.Dtos.Roles;
-using Backend.Dtos.Employees;
-using Backend.Dtos.Addresses;
-using Backend.Dtos.Auth;
-using Backend.Dtos.Positions;
-using Backend.Dtos;
-using Backend.Models;
+using backend.DTOs;
+using backend.Models;
 
-namespace Backend.Mappings;
+namespace backend.Mappings;
 
 public class MappingProfile : Profile
 {
   public MappingProfile()
   {
-    // Job Application Mappings
-    CreateMap<JobApplication, JobApplicationDto>()
-        .ForMember(dest => dest.JobTitle, opt => opt.MapFrom(src => src.Job!.Title))
-        .ForMember(dest => dest.CandidateName, opt => opt.MapFrom(src => src.Candidate!.FullName ?? "Unknown"))
-        .ForMember(dest => dest.CandidateEmail, opt => opt.MapFrom(src => src.Candidate!.User!.Email))
-        .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => src.Status!.Status))
-        .ForMember(dest => dest.ReviewerName, opt => opt.MapFrom(src => 
-            src.ReviewedBy != null 
-                ? src.Job!.Recruiter!.FullName ?? "Unknown" 
-                : null));
+    CreateMap<RegisterDto, User>()
+      .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.Email))
+      .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
+      .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTimeOffset.UtcNow))
+      .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTimeOffset.UtcNow))
+      .ForMember(dest => dest.IsDeleted, opt => opt.MapFrom(src => false));
 
-    CreateMap<JobApplicationCreateDto, JobApplication>()
-        .ForMember(dest => dest.Id, opt => opt.Ignore())
-        .ForMember(dest => dest.AppliedAt, opt => opt.Ignore())
-        .ForMember(dest => dest.LastUpdated, opt => opt.Ignore())
-        .ForMember(dest => dest.ReviewedAt, opt => opt.Ignore())
-        .ForMember(dest => dest.ReviewedBy, opt => opt.Ignore());
+    CreateMap<User, AuthResponseDto>()
+      .ConstructUsing(src => new AuthResponseDto(src.Id, src.Email, src.UserName, string.Empty));
 
-    CreateMap<JobApplicationUpdateDto, JobApplication>()
-        .ForMember(dest => dest.Id, opt => opt.Ignore())
-        .ForMember(dest => dest.JobId, opt => opt.Ignore())
-        .ForMember(dest => dest.CandidateId, opt => opt.Ignore())
-        .ForMember(dest => dest.AppliedAt, opt => opt.Ignore())
-        .ForMember(dest => dest.LastUpdated, opt => opt.MapFrom(src => DateTime.UtcNow));
+    // User mappings
+    CreateMap<CreateUserDto, User>()
+      .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.UserName ?? src.Email))
+      .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
+      .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTimeOffset.UtcNow))
+      .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTimeOffset.UtcNow))
+      .ForMember(dest => dest.IsDeleted, opt => opt.MapFrom(src => false));
 
-    // Candidate Mappings
-    CreateMap<Candidate, CandidateDto>()
-        .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User!.Email))
-        .ForMember(dest => dest.AddressDetails, opt => opt.MapFrom(src =>
-            src.Address != null
-                ? $"{src.Address.AddressLine1}, {src.Address.City!.Name}, {src.Address.City.State!.Name} {src.Address.Pincode}"
-                : null))
-        .ForMember(dest => dest.Skills, opt => opt.MapFrom(src => src.CandidateSkills))
-        .ForMember(dest => dest.TotalApplications, opt => opt.MapFrom(src => src.JobApplications.Count));
+    CreateMap<User, UserDto>();
+    CreateMap<User, UserListDto>();
 
-    CreateMap<CandidateCreateDto, Candidate>()
-        .ForMember(dest => dest.Id, opt => opt.Ignore());
+    // Profile mappings
+    CreateMap<Employee, backend.DTOs.Profile.EmployeeDto>()
+      .ForMember(dest => dest.UserEmail, opt => opt.MapFrom(src => src.User.Email))
+      .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.User.UserName));
 
-    CreateMap<CandidateUpdateDto, Candidate>()
-        .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+    CreateMap<Employee, backend.DTOs.Profile.EmployeeWithDetailsDto>()
+      .ForMember(dest => dest.UserEmail, opt => opt.MapFrom(src => src.User.Email))
+      .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.User.UserName))
+      .ForMember(dest => dest.BranchAddress, opt => opt.MapFrom(src => src.BranchAddress));
 
-    CreateMap<CreateCandidateDto, Candidate>()
-        .ForMember(dest => dest.Id, opt => opt.Ignore())
-        .ForMember(dest => dest.User, opt => opt.Ignore())
-        .ForMember(dest => dest.Address, opt => opt.Ignore())
-        .ForMember(dest => dest.CandidateSkills, opt => opt.Ignore())
-        .ForMember(dest => dest.CandidateQualifications, opt => opt.Ignore());
+    CreateMap<Candidate, backend.DTOs.Profile.CandidateDto>()
+      .ForMember(dest => dest.UserEmail, opt => opt.MapFrom(src => src.User.Email))
+      .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.User.UserName));
 
-    CreateMap<UpdateCandidateDto, Candidate>()
-        .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+    CreateMap<Candidate, backend.DTOs.Profile.CandidateWithDetailsDto>()
+      .ForMember(dest => dest.UserEmail, opt => opt.MapFrom(src => src.User.Email))
+      .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.User.UserName))
+      .ForMember(dest => dest.Address, opt => opt.MapFrom(src => src.Address));
 
-    // Candidate Skill Mappings
-    CreateMap<CandidateSkill, CandidateSkillDto>()
-        .ForMember(dest => dest.SkillName, opt => opt.MapFrom(src => src.Skill!.Name));
+    // Address mappings
+    CreateMap<Address, backend.DTOs.Location.AddressDto>()
+      .ForMember(dest => dest.CityName, opt => opt.MapFrom(src => src.City!.CityName))
+      .ForMember(dest => dest.StateName, opt => opt.MapFrom(src => src.City!.State!.StateName))
+      .ForMember(dest => dest.CountryName, opt => opt.MapFrom(src => src.City!.State!.Country!.CountryName));
 
-    CreateMap<CandidateSkillCreateDto, CandidateSkill>()
-        .ForMember(dest => dest.Id, opt => opt.Ignore())
-        .ForMember(dest => dest.CandidateId, opt => opt.Ignore());
+    CreateMap<Address, backend.DTOs.Location.FullAddressDto>()
+      .ForMember(dest => dest.City, opt => opt.MapFrom(src => src.City));
 
-    CreateMap<CandidateSkillUpdateDto, CandidateSkill>()
-        .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+    // Location mappings
+    CreateMap<Country, backend.DTOs.Location.CountryDto>();
+    CreateMap<State, backend.DTOs.Location.StateDto>()
+      .ForMember(dest => dest.CountryName, opt => opt.MapFrom(src => src.Country.CountryName));
+    CreateMap<City, backend.DTOs.Location.CityDto>()
+      .ForMember(dest => dest.StateName, opt => opt.MapFrom(src => src.State.StateName))
+      .ForMember(dest => dest.CountryName, opt => opt.MapFrom(src => src.State.Country.CountryName));
 
-    // Job Mappings
-    CreateMap<Job, JobDto>()
-        .ForMember(dest => dest.JobTypeName, opt => opt.MapFrom(src => src.JobType!.Type))
-        .ForMember(dest => dest.PositionName, opt => opt.MapFrom(src => src.Position!.Title))
-        .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => src.Status!.Status))
-        .ForMember(dest => dest.LocationDetails, opt => opt.MapFrom(src =>
-            src.Location != null
-                ? $"{src.Location.AddressLine1}, {src.Location.City!.Name}, {src.Location.City.State!.Name}"
-                : null))
-        .ForMember(dest => dest.RecruiterName, opt => opt.MapFrom(src => src.Recruiter!.FullName));
+    // Job mappings
+    CreateMap<backend.DTOs.Job.CreateJobDto, Job>()
+      .ForMember(dest => dest.Id, opt => opt.MapFrom(src => Guid.NewGuid()))
+      .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
+      .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
+      .ForMember(dest => dest.IsDeleted, opt => opt.MapFrom(src => false))
+      .ForMember(dest => dest.JobSkills, opt => opt.Ignore())
+      .ForMember(dest => dest.JobQualifications, opt => opt.Ignore());
 
-    CreateMap<JobCreateDto, Job>()
-        .ForMember(dest => dest.Id, opt => opt.Ignore())
-        .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
-        .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow));
+    CreateMap<Job, backend.DTOs.Job.JobResponseDto>()
+      .ForMember(dest => dest.Recruiter, opt => opt.MapFrom(src => src.Recruiter))
+      .ForMember(dest => dest.JobType, opt => opt.MapFrom(src => src.JobType))
+      .ForMember(dest => dest.Address, opt => opt.MapFrom(src => src.Address))
+      .ForMember(dest => dest.Position, opt => opt.MapFrom(src => src.Position))
+      .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status))
+      .ForMember(dest => dest.Skills, opt => opt.MapFrom(src => src.JobSkills))
+      .ForMember(dest => dest.Qualifications, opt => opt.MapFrom(src => src.JobQualifications))
+      .ForMember(dest => dest.ApplicationCount, opt => opt.MapFrom(src => src.JobApplications.Count(ja => !ja.IsDeleted)));
 
-    CreateMap<JobUpdateDto, Job>()
-        .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
-        .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+    CreateMap<Employee, backend.DTOs.Job.JobRecruiterDto>()
+      .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email));
 
-    // User Mappings
-    CreateMap<User, UserDto>()
-        .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.Role!.Name));
+    CreateMap<Models.JobType, backend.DTOs.Job.JobTypeDto>();
 
-    CreateMap<UserCreateDto, User>()
-        .ForMember(dest => dest.Id, opt => opt.Ignore())
-        .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
-        .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
-        .ForMember(dest => dest.Password, opt => opt.MapFrom(src => BCrypt.Net.BCrypt.HashPassword(src.Password)));
+    CreateMap<Address, backend.DTOs.Job.JobAddressDto>()
+      .ForMember(dest => dest.CityName, opt => opt.MapFrom(src => src.City!.CityName))
+      .ForMember(dest => dest.StateName, opt => opt.MapFrom(src => src.City!.State!.StateName))
+      .ForMember(dest => dest.CountryName, opt => opt.MapFrom(src => src.City!.State!.Country!.CountryName));
 
-    CreateMap<UserUpdateDto, User>()
-        .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
-        .ForMember(dest => dest.Password, opt => opt.MapFrom(src =>
-            !string.IsNullOrEmpty(src.Password) ? BCrypt.Net.BCrypt.HashPassword(src.Password) : null))
-        .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+    CreateMap<Position, backend.DTOs.Job.JobPositionDto>()
+      .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.Status));
 
-    // Role Mappings
-    CreateMap<Role, RoleDto>();
-    CreateMap<RoleCreateDto, Role>()
-        .ForMember(dest => dest.Id, opt => opt.Ignore());
-    CreateMap<RoleUpdateDto, Role>()
-        .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+    CreateMap<Models.JobStatus, backend.DTOs.Job.JobStatusDto>();
 
-    // Employee Mappings
-    CreateMap<Employee, EmployeeDto>()
-        .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User!.Email))
-        .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.User!.Role!.Name))
-        .ForMember(dest => dest.BranchDetails, opt => opt.MapFrom(src =>
-            src.BranchAddress != null
-                ? $"{src.BranchAddress.AddressLine1}, {src.BranchAddress.City!.Name}"
-                : null));
+    CreateMap<JobSkill, backend.DTOs.Job.JobSkillDto>()
+      .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Skill.Id))
+      .ForMember(dest => dest.SkillName, opt => opt.MapFrom(src => src.Skill.SkillName));
 
-    CreateMap<EmployeeCreateDto, Employee>()
-        .ForMember(dest => dest.Id, opt => opt.Ignore());
+    CreateMap<JobQualification, backend.DTOs.Job.JobQualificationResponseDto>()
+      .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Qualification.Id))
+      .ForMember(dest => dest.QualificationName, opt => opt.MapFrom(src => src.Qualification.QualificationName));
 
-    CreateMap<EmployeeUpdateDto, Employee>()
-        .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+    // Position mappings
+    CreateMap<backend.DTOs.Position.CreatePositionDto, Position>()
+      .ForMember(dest => dest.Id, opt => opt.MapFrom(src => Guid.NewGuid()))
+      .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
+      .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
+      .ForMember(dest => dest.IsDeleted, opt => opt.MapFrom(src => false))
+      .ForMember(dest => dest.PositionSkills, opt => opt.Ignore());
 
-    // Address Mappings
-    CreateMap<Address, AddressDto>()
-        .ForMember(dest => dest.CityName, opt => opt.MapFrom(src => src.City!.Name))
-        .ForMember(dest => dest.StateName, opt => opt.MapFrom(src => src.City!.State!.Name))
-        .ForMember(dest => dest.CountryName, opt => opt.MapFrom(src => src.City!.State!.Country!.Name));
+    CreateMap<Position, backend.DTOs.Position.PositionResponseDto>()
+      .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status))
+      .ForMember(dest => dest.Reviewer, opt => opt.MapFrom(src => src.Reviewer))
+      .ForMember(dest => dest.Skills, opt => opt.MapFrom(src => src.PositionSkills))
+      .ForMember(dest => dest.JobCount, opt => opt.MapFrom(src => src.Jobs.Count(j => !j.IsDeleted)));
 
-    CreateMap<AddressCreateDto, Address>()
-        .ForMember(dest => dest.Id, opt => opt.Ignore());
+    CreateMap<Models.PositionStatus, backend.DTOs.Position.PositionStatusDto>();
 
-    CreateMap<AddressUpdateDto, Address>()
-        .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+    CreateMap<Employee, backend.DTOs.Position.PositionReviewerDto>()
+      .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email));
 
-    // Auth Mappings
-    CreateMap<RegisterRequestDto, User>()
-        .ForMember(dest => dest.Id, opt => opt.Ignore())
-        .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
-        .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
-        .ForMember(dest => dest.Password, opt => opt.MapFrom(src => BCrypt.Net.BCrypt.HashPassword(src.Password)));
+    CreateMap<PositionSkill, backend.DTOs.Position.PositionSkillResponseDto>()
+      .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Skill.Id))
+      .ForMember(dest => dest.SkillName, opt => opt.MapFrom(src => src.Skill.SkillName));
 
-    // Position Mappings
-    CreateMap<Position, PositionDto>()
-        .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => src.Status!.Status))
-        .ForMember(dest => dest.ReviewerName, opt => opt.MapFrom(src => src.Reviewer!.FullName));
+    // Skill mappings
+    CreateMap<backend.DTOs.Skill.CreateSkillDto, Skill>()
+      .ForMember(dest => dest.Id, opt => opt.MapFrom(src => Guid.NewGuid()));
 
-    CreateMap<PositionCreateDto, Position>()
-        .ForMember(dest => dest.Id, opt => opt.Ignore());
+    CreateMap<Skill, backend.DTOs.Skill.SkillResponseDto>()
+      .ForMember(dest => dest.PositionCount, opt => opt.MapFrom(src => src.PositionSkills.Count))
+      .ForMember(dest => dest.JobCount, opt => opt.MapFrom(src => src.JobSkills.Count))
+      .ForMember(dest => dest.CandidateCount, opt => opt.MapFrom(src => src.CandidateSkills.Count));
 
-    CreateMap<PositionUpdateDto, Position>()
-        .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+    // JobType mappings
+    CreateMap<backend.DTOs.JobType.CreateJobTypeDto, JobType>();
 
-    // Lookup entity mappings
-    CreateMap<Skill, SkillDto>();
-    CreateMap<JobType, JobTypeDto>();
-    CreateMap<StatusType, StatusTypeDto>();
-    CreateMap<Qualification, QualificationDto>();
-    CreateMap<City, CityDto>()
-        .ForMember(dest => dest.StateName, opt => opt.MapFrom(src => src.State!.Name));
-    CreateMap<State, StateDto>()
-        .ForMember(dest => dest.CountryName, opt => opt.MapFrom(src => src.Country!.Name));
-    CreateMap<Country, CountryDto>();
+    CreateMap<backend.DTOs.JobType.UpdateJobTypeDto, JobType>()
+      .ForMember(dest => dest.Id, opt => opt.Ignore())
+      .ForMember(dest => dest.Jobs, opt => opt.Ignore());
+
+    CreateMap<JobType, backend.DTOs.JobType.JobTypeResponseDto>()
+      .ForMember(dest => dest.JobCount, opt => opt.MapFrom(src => src.Jobs.Count));
+
+    CreateMap<JobType, backend.DTOs.JobType.JobTypeListDto>()
+      .ForMember(dest => dest.JobCount, opt => opt.MapFrom(src => src.Jobs.Count));
+
+    // Qualification mappings
+    CreateMap<backend.DTOs.Qualification.CreateQualificationDto, Qualification>();
+
+    CreateMap<backend.DTOs.Qualification.UpdateQualificationDto, Qualification>()
+      .ForMember(dest => dest.Id, opt => opt.Ignore())
+      .ForMember(dest => dest.JobQualifications, opt => opt.Ignore())
+      .ForMember(dest => dest.CandidateQualifications, opt => opt.Ignore());
+
+    CreateMap<Qualification, backend.DTOs.Qualification.QualificationResponseDto>()
+      .ForMember(dest => dest.JobCount, opt => opt.MapFrom(src => src.JobQualifications.Count))
+      .ForMember(dest => dest.CandidateCount, opt => opt.MapFrom(src => src.CandidateQualifications.Count));
+
+    CreateMap<Qualification, backend.DTOs.Qualification.QualificationListDto>()
+      .ForMember(dest => dest.UsageCount, opt => opt.MapFrom(src => src.JobQualifications.Count + src.CandidateQualifications.Count));
+
+    // Candidate mappings
+    CreateMap<backend.DTOs.Candidate.CreateCandidateDto, Candidate>();
+
+    CreateMap<backend.DTOs.Candidate.UpdateCandidateDto, Candidate>()
+      .ForMember(dest => dest.Id, opt => opt.Ignore())
+      .ForMember(dest => dest.UserId, opt => opt.Ignore())
+      .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+      .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
+      .ForMember(dest => dest.IsDeleted, opt => opt.Ignore())
+      .ForMember(dest => dest.User, opt => opt.Ignore())
+      .ForMember(dest => dest.Address, opt => opt.Ignore())
+      .ForMember(dest => dest.Documents, opt => opt.Ignore())
+      .ForMember(dest => dest.JobApplications, opt => opt.Ignore())
+      .ForMember(dest => dest.Verifications, opt => opt.Ignore())
+      .ForMember(dest => dest.CandidateSkills, opt => opt.Ignore())
+      .ForMember(dest => dest.CandidateQualifications, opt => opt.Ignore());
+
+    CreateMap<Candidate, backend.DTOs.Candidate.CandidateResponseDto>()
+      .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email))
+      .ForMember(dest => dest.Address, opt => opt.MapFrom(src => src.Address))
+      .ForMember(dest => dest.Skills, opt => opt.MapFrom(src => src.CandidateSkills))
+      .ForMember(dest => dest.Qualifications, opt => opt.MapFrom(src => src.CandidateQualifications))
+      .ForMember(dest => dest.ApplicationCount, opt => opt.MapFrom(src => src.JobApplications.Count))
+      .ForMember(dest => dest.DocumentCount, opt => opt.MapFrom(src => src.Documents.Count));
+
+    CreateMap<Candidate, backend.DTOs.Candidate.CandidateListDto>()
+      .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email))
+      .ForMember(dest => dest.Location, opt => opt.MapFrom(src => src.Address != null && src.Address.City != null && src.Address.City.State != null ? $"{src.Address.City.CityName}, {src.Address.City.State.StateName}" : null))
+      .ForMember(dest => dest.ApplicationCount, opt => opt.MapFrom(src => src.JobApplications.Count))
+      .ForMember(dest => dest.SkillCount, opt => opt.MapFrom(src => src.CandidateSkills.Count));
+
+    // Candidate Skills mappings
+    CreateMap<backend.DTOs.Candidate.CreateCandidateSkillDto, CandidateSkill>();
+
+    CreateMap<CandidateSkill, backend.DTOs.Candidate.CandidateSkillDto>()
+      .ForMember(dest => dest.SkillName, opt => opt.MapFrom(src => src.Skill.SkillName));
+
+    // Candidate Qualifications mappings
+    CreateMap<backend.DTOs.Candidate.CreateCandidateQualificationDto, CandidateQualification>();
+
+    CreateMap<CandidateQualification, backend.DTOs.Candidate.CandidateQualificationDto>()
+      .ForMember(dest => dest.QualificationName, opt => opt.MapFrom(src => src.Qualification.QualificationName));
+
+    // Address mappings
+    CreateMap<backend.DTOs.Candidate.CreateAddressDto, Address>();
+
+    CreateMap<Address, backend.DTOs.Candidate.AddressDto>()
+      .ForMember(dest => dest.CityName, opt => opt.MapFrom(src => src.City != null ? src.City.CityName : string.Empty))
+      .ForMember(dest => dest.StateName, opt => opt.MapFrom(src => src.City != null && src.City.State != null ? src.City.State.StateName : string.Empty));
+
+    // Job Application mappings
+    CreateMap<backend.DTOs.JobApplication.CreateJobApplicationDto, JobApplication>();
+
+    CreateMap<backend.DTOs.JobApplication.UpdateJobApplicationDto, JobApplication>()
+      .ForMember(dest => dest.Id, opt => opt.Ignore())
+      .ForMember(dest => dest.JobId, opt => opt.Ignore())
+      .ForMember(dest => dest.CandidateId, opt => opt.Ignore())
+      .ForMember(dest => dest.AppliedAt, opt => opt.Ignore())
+      .ForMember(dest => dest.LastUpdated, opt => opt.Ignore())
+      .ForMember(dest => dest.CreatedBy, opt => opt.Ignore())
+      .ForMember(dest => dest.IsDeleted, opt => opt.Ignore())
+      .ForMember(dest => dest.Job, opt => opt.Ignore())
+      .ForMember(dest => dest.Candidate, opt => opt.Ignore())
+      .ForMember(dest => dest.Status, opt => opt.Ignore())
+      .ForMember(dest => dest.CreatedByUser, opt => opt.Ignore())
+      .ForMember(dest => dest.UpdatedByUser, opt => opt.Ignore())
+      .ForMember(dest => dest.ApplicationDocuments, opt => opt.Ignore())
+      .ForMember(dest => dest.Comments, opt => opt.Ignore())
+      .ForMember(dest => dest.OnlineTests, opt => opt.Ignore())
+      .ForMember(dest => dest.StatusHistory, opt => opt.Ignore());
+
+    CreateMap<JobApplication, backend.DTOs.JobApplication.JobApplicationResponseDto>()
+      .ForMember(dest => dest.JobTitle, opt => opt.MapFrom(src => src.Job.Title))
+      .ForMember(dest => dest.CompanyName, opt => opt.MapFrom(src => "Company Name")) // TODO: Add company info to Job model
+      .ForMember(dest => dest.CandidateName, opt => opt.MapFrom(src => src.Candidate.FullName))
+      .ForMember(dest => dest.CandidateEmail, opt => opt.MapFrom(src => src.Candidate.User.Email))
+      .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => src.Status.Status))
+      .ForMember(dest => dest.CreatedBy, opt => opt.MapFrom(src => src.CreatedByUser != null ? src.CreatedByUser.UserName : null))
+      .ForMember(dest => dest.UpdatedBy, opt => opt.MapFrom(src => src.UpdatedByUser != null ? src.UpdatedByUser.UserName : null))
+      .ForMember(dest => dest.Documents, opt => opt.MapFrom(src => src.ApplicationDocuments))
+      .ForMember(dest => dest.Comments, opt => opt.MapFrom(src => src.Comments))
+      .ForMember(dest => dest.StatusHistory, opt => opt.MapFrom(src => src.StatusHistory));
+
+    CreateMap<JobApplication, backend.DTOs.JobApplication.JobApplicationListDto>()
+      .ForMember(dest => dest.JobTitle, opt => opt.MapFrom(src => src.Job.Title))
+      .ForMember(dest => dest.CandidateName, opt => opt.MapFrom(src => src.Candidate.FullName))
+      .ForMember(dest => dest.CandidateEmail, opt => opt.MapFrom(src => src.Candidate.User.Email))
+      .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => src.Status.Status));
+
+    // Screening mappings
+    CreateMap<JobApplication, backend.DTOs.Screening.ScreeningResponseDto>()
+      .ForMember(dest => dest.CandidateName, opt => opt.MapFrom(src => src.Candidate.FullName ?? ""))
+      .ForMember(dest => dest.JobTitle, opt => opt.MapFrom(src => src.Job.Title))
+      .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.Status))
+      .ForMember(dest => dest.ScreenedBy, opt => opt.MapFrom(src => src.UpdatedByUser != null ? src.UpdatedByUser.UserName : ""))
+      .ForMember(dest => dest.ScreenedAt, opt => opt.MapFrom(src => src.LastUpdated ?? DateTime.UtcNow));
+
+    CreateMap<CandidateSkill, backend.DTOs.Screening.CandidateSkillScreeningDto>()
+      .ForMember(dest => dest.SkillName, opt => opt.MapFrom(src => src.Skill.SkillName))
+      .ForMember(dest => dest.YearsOfExperience, opt => opt.MapFrom(src => src.YearOfExperience))
+      .ForMember(dest => dest.ProficiencyLevel, opt => opt.MapFrom(src => ""))
+      .ForMember(dest => dest.IsVerified, opt => opt.MapFrom(src => src.YearOfExperience.HasValue));
+
+    CreateMap<Comment, backend.DTOs.Screening.CommentResponseDto>()
+      .ForMember(dest => dest.Comment, opt => opt.MapFrom(src => src.CommentText))
+      .ForMember(dest => dest.CommenterName, opt => opt.MapFrom(src => src.Commenter.FullName ?? ""))
+      .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => src.CreatedAt ?? DateTime.UtcNow));
+
+    CreateMap<JobApplication, backend.DTOs.Screening.ShortlistResponseDto>()
+      .ForMember(dest => dest.CandidateName, opt => opt.MapFrom(src => src.Candidate.FullName ?? ""))
+      .ForMember(dest => dest.JobTitle, opt => opt.MapFrom(src => src.Job.Title))
+      .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.Status))
+      .ForMember(dest => dest.ShortlistedAt, opt => opt.MapFrom(src => src.LastUpdated ?? DateTime.UtcNow))
+      .ForMember(dest => dest.ShortlistedBy, opt => opt.MapFrom(src => src.UpdatedByUser != null ? src.UpdatedByUser.UserName : ""));
   }
 }

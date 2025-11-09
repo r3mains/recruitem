@@ -1,92 +1,195 @@
-using Backend.Dtos.JobApplications;
-using Backend.Services.Interfaces;
+using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+using backend.DTOs.Screening;
+using backend.Repositories.IRepositories;
+using backend.Validators.ScreeningValidators;
 
-namespace Backend.Controllers;
+namespace backend.Controllers;
 
-[Route("api/[controller]")]
 [ApiController]
-[Authorize]
-public class ScreeningController(IScreeningService screeningService) : ControllerBase
+[Route("[controller]")]
+[ApiVersion("1.0")]
+[Authorize(Policy = "UserPolicy")]
+public class ScreeningController : ControllerBase
 {
+  private readonly IScreeningRepository _screeningRepository;
+  private readonly ICandidateRepository _candidateRepository;
+  private readonly IJobApplicationRepository _jobApplicationRepository;
+  private readonly IPositionRepository _positionRepository;
+  private readonly IEmployeeRepository _employeeRepository;
+  private readonly IMapper _mapper;
+  private readonly ScreenResumeValidator _screenResumeValidator;
+  private readonly AddCommentValidator _addCommentValidator;
+  private readonly UpdateCandidateSkillsValidator _updateCandidateSkillsValidator;
+  private readonly AssignReviewerValidator _assignReviewerValidator;
+  private readonly ShortlistCandidateValidator _shortlistCandidateValidator;
+
+  public ScreeningController(
+    IScreeningRepository screeningRepository,
+    ICandidateRepository candidateRepository,
+    IJobApplicationRepository jobApplicationRepository,
+    IPositionRepository positionRepository,
+    IEmployeeRepository employeeRepository,
+    IMapper mapper,
+    ScreenResumeValidator screenResumeValidator,
+    AddCommentValidator addCommentValidator,
+    UpdateCandidateSkillsValidator updateCandidateSkillsValidator,
+    AssignReviewerValidator assignReviewerValidator,
+    ShortlistCandidateValidator shortlistCandidateValidator)
+  {
+    _screeningRepository = screeningRepository;
+    _candidateRepository = candidateRepository;
+    _jobApplicationRepository = jobApplicationRepository;
+    _positionRepository = positionRepository;
+    _employeeRepository = employeeRepository;
+    _mapper = mapper;
+    _screenResumeValidator = screenResumeValidator;
+    _addCommentValidator = addCommentValidator;
+    _updateCandidateSkillsValidator = updateCandidateSkillsValidator;
+    _assignReviewerValidator = assignReviewerValidator;
+    _shortlistCandidateValidator = shortlistCandidateValidator;
+  }
+
   [HttpGet("applications")]
-  [Authorize(Policy = "RequireRecruitmentStaff")]
-  public async Task<ActionResult<List<JobApplicationDto>>> GetApplicationsForScreening(
-      [FromQuery] Guid? jobId = null,
-      [FromQuery] Guid? statusId = null)
+  [Authorize(Policy = "ScreenResumes")]
+  public async Task<ActionResult<IEnumerable<ScreeningResponseDto>>> GetApplicationsForScreening(
+    [FromQuery] Guid? positionId = null,
+    [FromQuery] string? search = null,
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 10)
   {
-    var applications = await screeningService.GetApplicationsForScreeningAsync(jobId, statusId);
-    return Ok(applications);
+    if (page < 1 || pageSize < 1 || pageSize > 100)
+    {
+      return BadRequest("Page must be >= 1 and PageSize must be between 1 and 100");
+    }
+
+    var applications = await _screeningRepository.GetApplicationsForScreeningAsync(positionId, search, page, pageSize);
+    var screeningDtos = _mapper.Map<IEnumerable<ScreeningResponseDto>>(applications);
+
+    return Ok(new
+    {
+      Applications = screeningDtos,
+      Pagination = new
+      {
+        CurrentPage = page,
+        PageSize = pageSize
+      }
+    });
   }
 
-  [HttpPost("screen/{applicationId}")]
-  [Authorize(Policy = "RequireRecruitmentStaff")]
-  public async Task<ActionResult<JobApplicationDto>> ScreenApplication(
-      Guid applicationId, 
-      ScreeningDto screeningDto)
+  [HttpPost("screen")]
+  [Authorize(Policy = "ScreenResumes")]
+  public async Task<ActionResult<ScreeningResponseDto>> ScreenResume(ScreenResumeDto screenResumeDto)
   {
-    var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
-                           throw new UnauthorizedAccessException());
+    var validationResult = await _screenResumeValidator.ValidateAsync(screenResumeDto);
+    if (!validationResult.IsValid)
+    {
+      return BadRequest(validationResult.Errors);
+    }
 
-    var result = await screeningService.ScreenApplicationAsync(applicationId, screeningDto, userId);
-    
-    if (result == null)
-      return NotFound();
+    var userId = GetCurrentUserId();
+    if (!userId.HasValue)
+    {
+      return Unauthorized();
+    }
 
-    return Ok(result);
+    try
+    {
+      var screenedApplication = await _screeningRepository.ScreenResumeAsync(
+        screenResumeDto.JobApplicationId,
+        screenResumeDto.Score,
+        screenResumeDto.Comments,
+        screenResumeDto.Approved,
+        userId.Value);
+
+      var responseDto = _mapper.Map<ScreeningResponseDto>(screenedApplication);
+      return Ok(responseDto);
+    }
+    catch (InvalidOperationException ex)
+    {
+      return BadRequest(ex.Message);
+    }
   }
 
-  [HttpPost("bulk-screen")]
-  [Authorize(Policy = "RequireRecruitmentStaff")]
-  public async Task<ActionResult<List<JobApplicationDto>>> BulkScreenApplications(
-      BulkScreeningDto bulkScreeningDto)
+  [HttpPost("comments")]
+  [Authorize(Policy = "AddReviewComments")]
+  public async Task<ActionResult<CommentResponseDto>> AddComment(AddCommentDto addCommentDto)
   {
-    var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
-                           throw new UnauthorizedAccessException());
+    var validationResult = await _addCommentValidator.ValidateAsync(addCommentDto);
+    if (!validationResult.IsValid)
+    {
+      return BadRequest(validationResult.Errors);
+    }
 
-    var results = await screeningService.BulkScreenApplicationsAsync(bulkScreeningDto, userId);
-    return Ok(results);
+    var userId = GetCurrentUserId();
+    if (!userId.HasValue)
+    {
+      return Unauthorized();
+    }
+
+    try
+    {
+      var comment = await _screeningRepository.AddCommentAsync(
+        addCommentDto.JobApplicationId,
+        addCommentDto.Comment,
+        userId.Value);
+
+      var commentDto = _mapper.Map<CommentResponseDto>(comment);
+      return Ok(commentDto);
+    }
+    catch (InvalidOperationException ex)
+    {
+      return BadRequest(ex.Message);
+    }
   }
 
   [HttpPost("shortlist")]
-  [Authorize(Policy = "RequireRecruitmentStaff")]
-  public async Task<ActionResult<List<JobApplicationDto>>> ShortlistApplications(
-      ShortlistingDto shortlistingDto)
+  [Authorize(Policy = "ShortlistCandidates")]
+  public async Task<ActionResult<ShortlistResponseDto>> ShortlistCandidate(ShortlistCandidateDto shortlistDto)
   {
-    var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
-                           throw new UnauthorizedAccessException());
+    var validationResult = await _shortlistCandidateValidator.ValidateAsync(shortlistDto);
+    if (!validationResult.IsValid)
+    {
+      return BadRequest(validationResult.Errors);
+    }
 
-    var results = await screeningService.ShortlistApplicationsAsync(shortlistingDto, userId);
-    return Ok(results);
+    var userId = GetCurrentUserId();
+    if (!userId.HasValue)
+    {
+      return Unauthorized();
+    }
+
+    try
+    {
+      var shortlistedApplication = await _screeningRepository.ShortlistCandidateAsync(
+        shortlistDto.JobApplicationId,
+        shortlistDto.Comments,
+        userId.Value);
+
+      var responseDto = _mapper.Map<ShortlistResponseDto>(shortlistedApplication);
+      return Ok(responseDto);
+    }
+    catch (InvalidOperationException ex)
+    {
+      return BadRequest(ex.Message);
+    }
   }
 
-  [HttpGet("shortlisted")]
-  [Authorize(Policy = "RequireRecruitmentStaff")]
-  public async Task<ActionResult<List<JobApplicationDto>>> GetShortlistedApplications(
-      [FromQuery] Guid? jobId = null)
+  [HttpGet("statistics")]
+  [Authorize(Policy = "ViewCandidates")]
+  public async Task<ActionResult<Dictionary<string, int>>> GetScreeningStatistics(
+    [FromQuery] Guid? positionId = null,
+    [FromQuery] DateTime? fromDate = null,
+    [FromQuery] DateTime? toDate = null)
   {
-    var applications = await screeningService.GetShortlistedApplicationsAsync(jobId);
-    return Ok(applications);
+    var stats = await _screeningRepository.GetScreeningStatsAsync(positionId, fromDate, toDate);
+    return Ok(stats);
   }
 
-  [HttpGet("calculate-score/{applicationId}")]
-  [Authorize(Policy = "RequireRecruitmentStaff")]
-  public async Task<ActionResult<double>> CalculateApplicationScore(Guid applicationId)
+  private Guid? GetCurrentUserId()
   {
-    var score = await screeningService.CalculateApplicationScoreAsync(applicationId);
-    return Ok(score);
-  }
-
-  [HttpGet("by-score-range")]
-  [Authorize(Policy = "RequireRecruitmentStaff")]
-  public async Task<ActionResult<List<JobApplicationDto>>> GetApplicationsByScoreRange(
-      [FromQuery] Guid jobId,
-      [FromQuery] double minScore,
-      [FromQuery] double maxScore)
-  {
-    var applications = await screeningService.GetApplicationsByScoreRangeAsync(jobId, minScore, maxScore);
-    return Ok(applications);
+    var userIdClaim = User.FindFirst("sub")?.Value ?? User.FindFirst("id")?.Value;
+    return userIdClaim != null ? Guid.Parse(userIdClaim) : null;
   }
 }

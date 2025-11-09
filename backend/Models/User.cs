@@ -1,14 +1,18 @@
-namespace Backend.Models;
+using Microsoft.AspNetCore.Identity;
 
-public class User
+namespace backend.Models;
+
+public class User : IdentityUser<Guid>
 {
-  public Guid Id { get; set; }
-  public string Email { get; set; } = string.Empty;
-  public string Password { get; set; } = string.Empty;
-  public Guid RoleId { get; set; }
-  public Role? Role { get; set; }
-  public DateTime? CreatedAt { get; set; }
-  public DateTime? UpdatedAt { get; set; }
-  public Candidate? Candidate { get; set; }
+  public DateTimeOffset? CreatedAt { get; set; }
+  public DateTimeOffset? UpdatedAt { get; set; }
+  public bool IsDeleted { get; set; }
+
+  // Navigation properties
   public Employee? Employee { get; set; }
+  public Candidate? Candidate { get; set; }
+  public ICollection<Document> UploadedDocuments { get; set; } = new List<Document>();
+  public ICollection<JobApplication> CreatedJobApplications { get; set; } = new List<JobApplication>();
+  public ICollection<JobApplication> UpdatedJobApplications { get; set; } = new List<JobApplication>();
+  public ICollection<ApplicationStatusHistory> StatusChanges { get; set; } = new List<ApplicationStatusHistory>();
 }

@@ -1,4 +1,4 @@
-namespace Backend.Models;
+namespace backend.Models;
 
 public class Address
 {
@@ -9,12 +9,8 @@ public class Address
   public string? Pincode { get; set; }
   public Guid? CityId { get; set; }
 
+  // Navigation properties
   public City? City { get; set; }
-  public ICollection<Job> Jobs { get; set; } = [];
-  public ICollection<Candidate> Candidates { get; set; } = [];
   public ICollection<Employee> Employees { get; set; } = [];
-
-  public string? Street => AddressLine1;
-  public string? State => City?.State?.Name;
-  public string? ZipCode => Pincode;
+  public ICollection<Candidate> Candidates { get; set; } = [];
 }

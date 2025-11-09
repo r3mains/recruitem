@@ -1,12 +1,19 @@
-namespace Backend.Models;
+using System.ComponentModel.DataAnnotations;
 
-public class CandidateSkill
+namespace backend.Models
 {
-  public Guid Id { get; set; }
-  public Guid CandidateId { get; set; }
-  public Guid SkillId { get; set; }
-  public int YearsOfExperience { get; set; }
+  public class CandidateSkill
+  {
+    public Guid Id { get; set; }
 
-  public Candidate? Candidate { get; set; }
-  public Skill? Skill { get; set; }
+    [Required]
+    public Guid CandidateId { get; set; }
+    public Candidate Candidate { get; set; } = null!;
+
+    [Required]
+    public Guid SkillId { get; set; }
+    public Skill Skill { get; set; } = null!;
+
+    public int? YearOfExperience { get; set; }
+  }
 }

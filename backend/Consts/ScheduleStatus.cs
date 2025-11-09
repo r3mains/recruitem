@@ -1,0 +1,9 @@
+namespace backend.Consts;
+
+public static class ScheduleStatus
+{
+  public const string Scheduled = "Scheduled";
+  public const string Rescheduled = "Rescheduled";
+  public const string Completed = "Completed";
+  public const string Cancelled = "Cancelled";
+}

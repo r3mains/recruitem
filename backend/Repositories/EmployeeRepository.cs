@@ -1,43 +1,31 @@
-using Backend.Data;
-using Backend.Models;
-using Backend.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using backend.Data;
+using backend.Models;
+using backend.Repositories.IRepositories;
 
-namespace Backend.Repositories;
-
-public class EmployeeRepository(AppDbContext db) : IEmployeeRepository
+namespace backend.Repositories
 {
-  private readonly AppDbContext _db = db;
-
-  public async Task<Employee?> GetById(Guid id)
+  public class EmployeeRepository : IEmployeeRepository
   {
-    return await _db.Employees.FirstOrDefaultAsync(x => x.Id == id);
-  }
+    private readonly ApplicationDbContext _context;
 
-  public async Task<List<Employee>> GetAll()
-  {
-    return await _db.Employees.ToListAsync();
-  }
-
-  public async Task Add(Employee entity)
-  {
-    await _db.Employees.AddAsync(entity);
-    await _db.SaveChangesAsync();
-  }
-
-  public async Task Update(Employee entity)
-  {
-    _db.Employees.Update(entity);
-    await _db.SaveChangesAsync();
-  }
-
-  public async Task DeleteById(Guid id)
-  {
-    var entity = await _db.Employees.FindAsync(id);
-    if (entity != null)
+    public EmployeeRepository(ApplicationDbContext context)
     {
-      _db.Employees.Remove(entity);
-      await _db.SaveChangesAsync();
+      _context = context;
+    }
+
+    public async Task<Employee?> GetEmployeeByUserIdAsync(Guid userId)
+    {
+      return await _context.Employees
+          .Include(e => e.User)
+          .FirstOrDefaultAsync(e => e.UserId == userId && !e.IsDeleted);
+    }
+
+    public async Task<Employee?> GetEmployeeByIdAsync(Guid id)
+    {
+      return await _context.Employees
+          .Include(e => e.User)
+          .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted);
     }
   }
 }

@@ -1,114 +1,228 @@
-using Backend.Data;
-using Backend.Middlewares;
-using Backend.Models;
-using Backend.Extensions;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
-using FluentValidation;
-using FluentValidation.AspNetCore;
-using Backend.Repositories.Interfaces;
-using Backend.Repositories;
-using Backend.Services;
-using Backend.Services.Interfaces;
-using Backend.Services.Auth;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
+using Microsoft.Extensions.Options;
+using Serilog;
+using Swashbuckle.AspNetCore.SwaggerGen;
+using FluentValidation;
+using FluentValidation.AspNetCore;
+using FluentEmail.Core;
+using FluentEmail.Smtp;
+using backend;
+using backend.Data;
+using backend.Models;
+using backend.Middlewares;
+using backend.Conventions;
+using backend.Consts;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-builder.Services.AddFluentValidationAutoValidation();
-builder.Services.AddValidatorsFromAssemblyContaining<Program>();
-builder.Services.AddAutoMapper(typeof(Program));
-
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<ICandidateService, CandidateService>();
-builder.Services.AddScoped<IJobService, JobService>();
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IRoleService, RoleService>();
-builder.Services.AddScoped<IEmployeeService, EmployeeService>();
-builder.Services.AddScoped<ILookupService, LookupService>();
-builder.Services.AddScoped<IPositionService, PositionService>();
-builder.Services.AddScoped<IScreeningService, ScreeningService>();
-builder.Services.AddScoped<JobApplicationService>();
-
-builder.Services.AddScoped<ICandidateRepository, CandidateRepository>();
-builder.Services.AddScoped<IJobRepository, JobRepository>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IRoleRepository, RoleRepository>();
-builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
-builder.Services.AddScoped<IJobApplicationRepository, JobApplicationRepository>();
-
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-      options.TokenValidationParameters = new TokenValidationParameters
-      {
-        ValidateIssuer = false,
-        ValidateAudience = false,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(
-              Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? "dev_secret_change_me"))
-      };
-    });
-
-builder.Services.AddAuthorization(options =>
+// Versioning
+builder.Services.AddApiVersioning(options =>
 {
-  options.AddPolicy("AdminOnly", policy => policy.RequireClaim("role", "Admin"));
-  options.AddPolicy("StaffOnly", policy => policy.RequireClaim("role", "Admin", "HR", "Recruiter"));
-  options.AddPolicy("RecruiterOrHR", policy => policy.RequireClaim("role", "Admin", "HR", "Recruiter"));
-  options.AddPolicy("CandidateOnly", policy => policy.RequireClaim("role", "Candidate"));
-  options.AddPolicy("RequireRecruitmentStaff", policy => policy.RequireClaim("role", "Admin", "HR", "Recruiter"));
-  options.AddPolicy("RequireCandidate", policy => policy.RequireClaim("role", "Candidate"));
-  options.AddPolicy("RequireAdminOrRecruiter", policy => policy.RequireClaim("role", "Admin", "Recruiter"));
+  options.AssumeDefaultVersionWhenUnspecified = true;
+  options.DefaultApiVersion = new ApiVersion(1, 0);
+  options.ReportApiVersions = true;
 });
 
-builder.Services.AddCors(options =>
+// Versioned API Explorer
+builder.Services.AddVersionedApiExplorer(options =>
 {
-  options.AddPolicy("AllowFrontend", policy =>
+  options.GroupNameFormat = "'v'VVV";
+  options.SubstituteApiVersionInUrl = true;
+});
+
+// Swagger configuration
+builder.Services.AddSwaggerGen();
+builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, ConfigureSwaggerOptions>();
+
+// Logging
+var logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.File("Logs/log-.txt", rollingInterval: RollingInterval.Day)
+    .MinimumLevel.Information()
+    .CreateLogger();
+builder.Logging.ClearProviders();
+builder.Logging.AddSerilog(logger);
+
+// Controllers with global version route prefix
+builder.Services.AddControllers(options =>
+{
+  options.Conventions.Insert(0, new RoutePrefixConvention(new RouteAttribute("api/v{version:apiVersion}")));
+});
+
+// Validation
+builder.Services.AddFluentValidationAutoValidation(options => options.DisableDataAnnotationsValidation = true);
+builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
+
+// Database
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                      ?? Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
+                      ?? throw new InvalidOperationException("Database connection string not found in configuration or environment variables.");
+builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(connectionString));
+
+// Identity Core
+builder.Services.AddIdentityCore<User>(options =>
+{
+  options.User.RequireUniqueEmail = true;
+})
+.AddRoles<IdentityRole<Guid>>()
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultTokenProviders();
+
+// AutoMapper
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
+// Repositories
+builder.Services.AddScoped<backend.Repositories.IRepositories.IAuthRepository, backend.Repositories.AuthRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IUserRepository, backend.Repositories.UserRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IProfileRepository, backend.Repositories.ProfileRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IJobRepository, backend.Repositories.JobRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IEmployeeRepository, backend.Repositories.EmployeeRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IPositionRepository, backend.Repositories.PositionRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.ISkillRepository, backend.Repositories.SkillRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IJobTypeRepository, backend.Repositories.JobTypeRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IQualificationRepository, backend.Repositories.QualificationRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.ICandidateRepository, backend.Repositories.CandidateRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IJobApplicationRepository, backend.Repositories.JobApplicationRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IScreeningRepository, backend.Repositories.ScreeningRepository>();
+
+// FluentEmail
+var emailHost = builder.Configuration["Email:Host"] ?? Environment.GetEnvironmentVariable("SMTP_HOST") ?? "smtp.gmail.com";
+var emailPort = int.Parse(builder.Configuration["Email:Port"] ?? Environment.GetEnvironmentVariable("SMTP_PORT") ?? "587");
+var emailUsername = builder.Configuration["Email:Username"] ?? Environment.GetEnvironmentVariable("EMAIL_USERNAME") ?? throw new InvalidOperationException("Email username not found in configuration or environment variables.");
+var emailPassword = builder.Configuration["Email:Password"] ?? Environment.GetEnvironmentVariable("EMAIL_PASSWORD") ?? throw new InvalidOperationException("Email password not found in configuration or environment variables.");
+var fromEmail = builder.Configuration["Email:FromEmail"] ?? Environment.GetEnvironmentVariable("FROM_EMAIL") ?? emailUsername;
+var fromName = builder.Configuration["Email:FromName"] ?? Environment.GetEnvironmentVariable("FROM_NAME") ?? "Recruitment System";
+
+builder.Services
+    .AddFluentEmail(fromEmail, fromName)
+    .AddSmtpSender(emailHost, emailPort, emailUsername, emailPassword);
+
+// Email Service
+builder.Services.AddScoped<backend.Services.IServices.IEmailService, backend.Services.FluentEmailService>();
+
+// Authentication
+// JWT Configuration
+var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? throw new InvalidOperationException("JWT secret key not found in configuration or environment variables.");
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "https://localhost:7142";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "https://localhost:7142";
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+  .AddJwtBearer(options =>
   {
-    policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "http://localhost:5174", "http://localhost:5270")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+      ValidateIssuer = true,
+      ValidateAudience = true,
+      ValidateLifetime = true,
+      ValidateIssuerSigningKey = true,
+      ValidIssuer = jwtIssuer,
+      ValidAudience = jwtAudience,
+      IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+    };
   });
 
-  options.AddDefaultPolicy(policy =>
-  {
-    policy.AllowAnyOrigin()
-          .AllowAnyHeader()
-          .AllowAnyMethod();
-  });
+// Authorization with RBAC Policies
+builder.Services.AddAuthorization(options =>
+{
+  options.AddPolicy("ManageJobs", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter));
+  options.AddPolicy("ViewJobs", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Reviewer, Roles.Candidate, Roles.Viewer));
+  options.AddPolicy("CloseJobs", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter, Roles.HR));
+  options.AddPolicy("ManageCandidates", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter));
+  options.AddPolicy("ViewCandidates", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Reviewer, Roles.Viewer));
+  options.AddPolicy("UploadCandidates", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter));
+  options.AddPolicy("ScreenResumes", policy => policy.RequireRole(Roles.Admin, Roles.Reviewer, Roles.Recruiter));
+  options.AddPolicy("AddReviewComments", policy => policy.RequireRole(Roles.Admin, Roles.Reviewer, Roles.Recruiter, Roles.Interviewer));
+  options.AddPolicy("AssignReviewers", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter));
+  options.AddPolicy("ShortlistCandidates", policy => policy.RequireRole(Roles.Admin, Roles.Reviewer, Roles.Recruiter));
+  options.AddPolicy("ScheduleInterviews", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter, Roles.HR));
+  options.AddPolicy("ConductInterviews", policy => policy.RequireRole(Roles.Admin, Roles.Interviewer, Roles.HR));
+  options.AddPolicy("AddInterviewFeedback", policy => policy.RequireRole(Roles.Admin, Roles.Interviewer, Roles.HR));
+  options.AddPolicy("ViewInterviewFeedback", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Viewer));
+  options.AddPolicy("AssignInterviewers", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter, Roles.HR));
+  options.AddPolicy("VerifyDocuments", policy => policy.RequireRole(Roles.Admin, Roles.HR));
+  options.AddPolicy("BackgroundVerification", policy => policy.RequireRole(Roles.Admin, Roles.HR));
+  options.AddPolicy("FinalSelection", policy => policy.RequireRole(Roles.Admin, Roles.HR));
+  options.AddPolicy("GenerateOfferLetters", policy => policy.RequireRole(Roles.Admin, Roles.HR));
+  options.AddPolicy("SetJoiningDate", policy => policy.RequireRole(Roles.Admin, Roles.HR));
+  options.AddPolicy("ChangeStatus", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter));
+  options.AddPolicy("HoldProfiles", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer));
+  options.AddPolicy("ManageUsers", policy => policy.RequireRole(Roles.Admin));
+  options.AddPolicy("ManageRoles", policy => policy.RequireRole(Roles.Admin));
+  options.AddPolicy("ViewUsers", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Viewer));
+  options.AddPolicy("ViewReports", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Viewer));
+  options.AddPolicy("GenerateReports", policy => policy.RequireRole(Roles.Admin, Roles.HR));
+  options.AddPolicy("ViewDashboard", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Reviewer));
+  options.AddPolicy("ManageExams", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter, Roles.HR));
+  options.AddPolicy("TakeExams", policy => policy.RequireRole(Roles.Candidate));
+  options.AddPolicy("ViewExamResults", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Reviewer));
+  options.AddPolicy("CandidatePortal", policy => policy.RequireRole(Roles.Candidate));
+  options.AddPolicy("UploadDocuments", policy => policy.RequireRole(Roles.Candidate));
+  options.AddPolicy("ViewJobOpenings", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Reviewer, Roles.Candidate, Roles.Viewer));
+  options.AddPolicy("SystemConfig", policy => policy.RequireRole(Roles.Admin));
+  options.AddPolicy("ViewLogs", policy => policy.RequireRole(Roles.Admin));
+  options.AddPolicy("ManageNotifications", policy => policy.RequireRole(Roles.Admin, Roles.HR));
+  options.AddPolicy("ViewerAccess", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Reviewer, Roles.Viewer));
 });
 
 var app = builder.Build();
 
+var apiVersionDescriptionProvider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+
+// Development Environment
 if (app.Environment.IsDevelopment())
 {
   app.UseSwagger();
-  app.UseSwaggerUI();
+  app.UseSwaggerUI(options =>
+  {
+    foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions)
+    {
+      options.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", description.GroupName);
+    }
+  });
+
+  using var scope = app.Services.CreateScope();
+
+  var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+  var rolesToCreate = new[]
+  {
+    Roles.Recruiter,
+    Roles.HR,
+    Roles.Interviewer,
+    Roles.Reviewer,
+    Roles.Admin,
+    Roles.Candidate,
+    Roles.Viewer
+  };
+
+  foreach (var roleName in rolesToCreate)
+  {
+    if (!await roleManager.RoleExistsAsync(roleName))
+    {
+      await roleManager.CreateAsync(new IdentityRole<Guid> { Name = roleName });
+    }
+  }
 }
 
-app.UseCors("AllowFrontend");
-app.UseMiddleware<GlobalExceptionMiddleware>();
-app.UseStaticFiles();
+// Global Exception Handler
+app.UseMiddleware<GlobalExceptionHandler>();
+
+// HTTPS Redirection
 app.UseHttpsRedirection();
+
+// Authentication
 app.UseAuthentication();
+
+// Authorization
 app.UseAuthorization();
+
+// Controllers
 app.MapControllers();
 
-// Seed data
-using (var scope = app.Services.CreateScope())
-{
-  var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-  await context.SeedStatusTypesAsync();
-}
-
 app.Run();
+

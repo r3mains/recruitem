@@ -1,9 +1,11 @@
-namespace Backend.Models;
+namespace backend.Models;
 
 public class Qualification
 {
-  public Guid Id { get; set; }
-  public string Name { get; set; } = string.Empty;
+  public Guid Id { get; set; } = Guid.NewGuid();
+  public string QualificationName { get; set; } = string.Empty;
 
-  public ICollection<CandidateQualification> CandidateQualifications { get; set; } = [];
+  // Navigation properties
+  public virtual ICollection<JobQualification> JobQualifications { get; set; } = [];
+  public virtual ICollection<CandidateQualification> CandidateQualifications { get; set; } = new List<CandidateQualification>();
 }
