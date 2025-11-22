@@ -17,6 +17,8 @@ import PositionsPage from "./pages/PositionsPage";
 import CandidatesPage from "./pages/CandidatesPage";
 import CandidateProfilePage from "./pages/CandidateProfilePage";
 import ScreeningPage from "./pages/ScreeningPage";
+import InterviewsPage from "./pages/InterviewsPage";
+import LandingPage from "./pages/LandingPage";
 
 function App() {
   return (
@@ -32,7 +34,7 @@ function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/browse-jobs" element={<PublicJobListings />} />
               <Route path="/job/:id" element={<JobDetail />} />
-              <Route path="/" element={<PublicJobListings />} />
+              <Route path="/" element={<LandingPage />} />
 
               <Route
                 path="/dashboard"
@@ -108,6 +110,23 @@ function App() {
                     ]}
                   >
                     <ScreeningPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/interviews"
+                element={
+                  <ProtectedRoute
+                    requiredRoles={[
+                      "Admin",
+                      "Recruiter",
+                      "HR",
+                      "Interviewer",
+                      "Reviewer",
+                    ]}
+                  >
+                    <InterviewsPage />
                   </ProtectedRoute>
                 }
               />

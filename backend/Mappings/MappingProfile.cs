@@ -1,5 +1,6 @@
 using AutoMapper;
 using backend.DTOs;
+using backend.DTOs.Interview;
 using backend.Models;
 
 namespace backend.Mappings;
@@ -281,5 +282,17 @@ public class MappingProfile : Profile
       .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.Status))
       .ForMember(dest => dest.ShortlistedAt, opt => opt.MapFrom(src => src.LastUpdated ?? DateTime.UtcNow))
       .ForMember(dest => dest.ShortlistedBy, opt => opt.MapFrom(src => src.UpdatedByUser != null ? src.UpdatedByUser.UserName : ""));
+
+    // Interview mappings
+    CreateMap<Interview, InterviewDto>();
+    CreateMap<CreateInterviewDto, Interview>();
+
+    CreateMap<InterviewSchedule, InterviewScheduleDto>();
+    CreateMap<CreateInterviewScheduleDto, InterviewSchedule>();
+
+    CreateMap<InterviewFeedback, InterviewFeedbackDto>();
+    CreateMap<CreateInterviewFeedbackDto, InterviewFeedback>();
+
+    CreateMap<InterviewType, InterviewTypeDto>();
   }
 }

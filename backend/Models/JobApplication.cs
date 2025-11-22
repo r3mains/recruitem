@@ -33,10 +33,10 @@ namespace backend.Models
 
     public bool IsDeleted { get; set; } = false;
 
-    // Navigation properties
     public ICollection<ApplicationDocument> ApplicationDocuments { get; set; } = new List<ApplicationDocument>();
     public ICollection<Comment> Comments { get; set; } = new List<Comment>();
     public ICollection<OnlineTest> OnlineTests { get; set; } = new List<OnlineTest>();
     public ICollection<ApplicationStatusHistory> StatusHistory { get; set; } = new List<ApplicationStatusHistory>();
+    public ICollection<Interview> Interviews { get; set; } = new List<Interview>();
   }
 }

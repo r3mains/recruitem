@@ -12,11 +12,13 @@ public class Employee
   public DateTime UpdatedAt { get; set; }
   public bool IsDeleted { get; set; } = false;
 
-  // Navigation properties
   public User User { get; set; } = null!;
   public Address? BranchAddress { get; set; }
   public virtual ICollection<Position> ReviewedPositions { get; set; } = [];
   public virtual ICollection<Job> RecruitedJobs { get; set; } = [];
   public ICollection<Comment> Comments { get; set; } = new List<Comment>();
   public ICollection<Verification> Verifications { get; set; } = new List<Verification>();
+  public ICollection<Interviewer> InterviewsAsInterviewer { get; set; } = new List<Interviewer>();
+  public ICollection<InterviewSchedule> CreatedInterviewSchedules { get; set; } = new List<InterviewSchedule>();
+  public ICollection<InterviewFeedback> InterviewFeedbacks { get; set; } = new List<InterviewFeedback>();
 }

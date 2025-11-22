@@ -160,8 +160,48 @@ const PublicJobListings = () => {
 
         <div className="grid gap-6">
           {jobs.length === 0 ? (
-            <div className="bg-white p-6 rounded-lg shadow text-center text-gray-500">
-              No jobs available at the moment.
+            <div className="bg-white p-12 rounded-lg shadow text-center">
+              <div className="max-w-md mx-auto">
+                <div className="bg-gray-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
+                  <svg
+                    className="w-10 h-10 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6.5"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  No Jobs Available
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  There are currently no job openings available. Please check
+                  back later or create an account to be notified when new
+                  positions are posted.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={loadData}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Refresh
+                  </button>
+                  {!user && (
+                    <button
+                      onClick={() => navigate("/register")}
+                      className="bg-gray-100 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-200 transition-colors"
+                    >
+                      Create Account
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
             jobs.map((job) => (

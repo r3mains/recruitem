@@ -38,7 +38,7 @@ public class CandidateController : ControllerBase
   // GET /api/v1/candidate
   [HttpGet]
   [Authorize(Policy = "ViewCandidates")]
-  public async Task<ActionResult<IEnumerable<CandidateListDto>>> GetCandidates(
+  public async Task<IActionResult> GetCandidates(
     [FromQuery] string? search = null,
     [FromQuery] int page = 1,
     [FromQuery] int pageSize = 10)
@@ -72,7 +72,7 @@ public class CandidateController : ControllerBase
   // GET /api/v1/candidate/{id}
   [HttpGet("{id}")]
   [Authorize(Policy = "ViewCandidates")]
-  public async Task<ActionResult<CandidateResponseDto>> GetCandidate(Guid id)
+  public async Task<IActionResult> GetCandidate(Guid id)
   {
     var candidate = await _candidateRepository.GetByIdAsync(id);
     if (candidate == null)
@@ -86,7 +86,7 @@ public class CandidateController : ControllerBase
 
   [HttpPost]
   [Authorize(Policy = "ManageCandidates")]
-  public async Task<ActionResult<CandidateResponseDto>> CreateCandidate(CreateCandidateDto createCandidateDto)
+  public async Task<IActionResult> CreateCandidate(CreateCandidateDto createCandidateDto)
   {
     var validationResult = await _createCandidateValidator.ValidateAsync(createCandidateDto);
     if (!validationResult.IsValid)
@@ -158,7 +158,7 @@ public class CandidateController : ControllerBase
   // PUT /api/v1/candidate/{id}
   [HttpPut("{id}")]
   [Authorize(Policy = "ManageCandidates")]
-  public async Task<ActionResult<CandidateResponseDto>> UpdateCandidate(Guid id, UpdateCandidateDto updateCandidateDto)
+  public async Task<IActionResult> UpdateCandidate(Guid id, UpdateCandidateDto updateCandidateDto)
   {
     var validationResult = await _updateCandidateValidator.ValidateAsync(updateCandidateDto);
     if (!validationResult.IsValid)
@@ -220,7 +220,7 @@ public class CandidateController : ControllerBase
   // PUT /api/v1/candidate/profile
   [HttpPut("profile")]
   [Authorize(Roles = "Candidate")]
-  public async Task<ActionResult<CandidateResponseDto>> UpdateMyProfile(UpdateCandidateDto updateCandidateDto)
+  public async Task<IActionResult> UpdateMyProfile(UpdateCandidateDto updateCandidateDto)
   {
     var userId = Guid.Parse(User.FindFirst("sub")?.Value ?? User.FindFirst("id")?.Value!);
     var candidate = await _candidateRepository.GetByUserIdAsync(userId);
@@ -236,7 +236,7 @@ public class CandidateController : ControllerBase
   // GET /api/v1/candidate/profile
   [HttpGet("profile")]
   [Authorize(Roles = "Candidate")]
-  public async Task<ActionResult<CandidateResponseDto>> GetMyProfile()
+  public async Task<IActionResult> GetMyProfile()
   {
     var userId = Guid.Parse(User.FindFirst("sub")?.Value ?? User.FindFirst("id")?.Value!);
     var candidate = await _candidateRepository.GetByUserIdAsync(userId);

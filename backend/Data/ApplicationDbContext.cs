@@ -40,6 +40,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
   public DbSet<CandidateSkill> CandidateSkills { get; set; }
   public DbSet<CandidateQualification> CandidateQualifications { get; set; }
 
+  public DbSet<InterviewType> InterviewTypes { get; set; }
+  public DbSet<Interview> Interviews { get; set; }
+  public DbSet<Interviewer> Interviewers { get; set; }
+  public DbSet<InterviewSchedule> InterviewSchedules { get; set; }
+  public DbSet<InterviewFeedback> InterviewFeedbacks { get; set; }
+
   protected override void OnModelCreating(ModelBuilder builder)
   {
     base.OnModelCreating(builder);
@@ -395,6 +401,98 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
       entity.HasIndex(e => new { e.CandidateId, e.QualificationId }).IsUnique();
     });
+
+    builder.Entity<InterviewType>(entity =>
+    {
+      entity.HasKey(e => e.Id);
+      entity.Property(e => e.Type).IsRequired().HasMaxLength(50);
+    });
+
+    builder.Entity<Interview>(entity =>
+    {
+      entity.HasKey(e => e.Id);
+      entity.Property(e => e.CreatedAt).IsRequired();
+      entity.Property(e => e.UpdatedAt).IsRequired();
+      entity.Property(e => e.IsDeleted).IsRequired().HasDefaultValue(false);
+
+      entity.HasOne(e => e.JobApplication)
+            .WithMany(ja => ja.Interviews)
+            .HasForeignKey(e => e.JobApplicationId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+      entity.HasOne(e => e.InterviewType)
+            .WithMany(it => it.Interviews)
+            .HasForeignKey(e => e.InterviewTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+      entity.HasOne(e => e.Status)
+            .WithMany(s => s.Interviews)
+            .HasForeignKey(e => e.StatusId)
+            .OnDelete(DeleteBehavior.Restrict);
+    });
+
+    builder.Entity<Interviewer>(entity =>
+    {
+      entity.HasKey(e => e.Id);
+
+      entity.HasOne(e => e.Interview)
+            .WithMany(i => i.Interviewers)
+            .HasForeignKey(e => e.InterviewId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+      entity.HasOne(e => e.InterviewerEmployee)
+            .WithMany(emp => emp.InterviewsAsInterviewer)
+            .HasForeignKey(e => e.InterviewerId)
+            .OnDelete(DeleteBehavior.Cascade);
+    });
+
+    builder.Entity<InterviewSchedule>(entity =>
+    {
+      entity.HasKey(e => e.Id);
+      entity.Property(e => e.ScheduledAt).IsRequired();
+      entity.Property(e => e.Location).HasMaxLength(255);
+      entity.Property(e => e.MeetingLink).HasMaxLength(500);
+      entity.Property(e => e.CreatedAt).IsRequired();
+
+      entity.HasOne(e => e.Interview)
+            .WithMany(i => i.InterviewSchedules)
+            .HasForeignKey(e => e.InterviewId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+      entity.HasOne(e => e.Status)
+            .WithMany(s => s.InterviewSchedules)
+            .HasForeignKey(e => e.StatusId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+      entity.HasOne(e => e.CreatedByEmployee)
+            .WithMany(emp => emp.CreatedInterviewSchedules)
+            .HasForeignKey(e => e.CreatedBy)
+            .OnDelete(DeleteBehavior.Cascade);
+    });
+
+    builder.Entity<InterviewFeedback>(entity =>
+    {
+      entity.HasKey(e => e.Id);
+      entity.Property(e => e.Rating).IsRequired();
+      entity.Property(e => e.CreatedAt).IsRequired();
+
+      entity.HasOne(e => e.Interview)
+            .WithMany(i => i.InterviewFeedbacks)
+            .HasForeignKey(e => e.InterviewId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+      entity.HasOne(e => e.Skill)
+            .WithMany(s => s.InterviewFeedbacks)
+            .HasForeignKey(e => e.ForSkill)
+            .OnDelete(DeleteBehavior.Restrict);
+
+      entity.HasOne(e => e.FeedbackByEmployee)
+            .WithMany(emp => emp.InterviewFeedbacks)
+            .HasForeignKey(e => e.FeedbackBy)
+            .OnDelete(DeleteBehavior.Cascade);
+
+      entity.ToTable(t => t.HasCheckConstraint("CK_InterviewFeedback_Rating", "\"Rating\" >= 1 AND \"Rating\" <= 5"));
+    });
   }
 
   private void SeedStatuses(ModelBuilder builder)
@@ -464,6 +562,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
       new Models.DocumentType { Id = new Guid("90000000-0000-0000-0000-000000000006"), Type = Consts.DocumentType.AddressProof },
       new Models.DocumentType { Id = new Guid("90000000-0000-0000-0000-000000000007"), Type = Consts.DocumentType.Portfolio },
       new Models.DocumentType { Id = new Guid("90000000-0000-0000-0000-000000000008"), Type = Consts.DocumentType.References }
+    );
+
+    builder.Entity<InterviewType>().HasData(
+      new InterviewType { Id = new Guid("A0000000-0000-0000-0000-000000000001"), Type = "Technical" },
+      new InterviewType { Id = new Guid("A0000000-0000-0000-0000-000000000002"), Type = "HR" }
     );
   }
 }

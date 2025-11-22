@@ -86,6 +86,21 @@ const Navigation = () => {
                 </Link>
               )}
 
+              {hasRole([
+                "Admin",
+                "Recruiter",
+                "HR",
+                "Interviewer",
+                "Reviewer",
+              ]) && (
+                <Link
+                  to="/interviews"
+                  className="hover:bg-blue-700 px-3 py-2 rounded"
+                >
+                  Interviews
+                </Link>
+              )}
+
               {hasRole(["Admin"]) && (
                 <Link
                   to="/users"

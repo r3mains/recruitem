@@ -2,10 +2,13 @@ using System.ComponentModel.DataAnnotations;
 
 namespace backend.Models
 {
-  public class InterviewStatus
+  public class InterviewType
   {
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Status { get; set; } = string.Empty;
+    public Guid Id { get; set; }
+
+    [Required]
+    [MaxLength(50)]
+    public string Type { get; set; } = string.Empty;
 
     public ICollection<Interview> Interviews { get; set; } = new List<Interview>();
   }

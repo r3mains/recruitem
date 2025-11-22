@@ -14,11 +14,14 @@ const JobForm = ({
     title: job?.title || "",
     description: job?.description || "",
     jobTypeId: job?.jobTypeId || "",
-    locationId: job?.locationId || "",
+    addressId: job?.addressId || job?.locationId || "",
     salaryMin: job?.salaryMin || "",
     salaryMax: job?.salaryMax || "",
     positionId: job?.positionId || "",
     statusId: job?.statusId || "",
+    requiredSkillIds: job?.requiredSkillIds || [],
+    preferredSkillIds: job?.preferredSkillIds || [],
+    qualifications: job?.qualifications || [],
   });
   const [saving, setSaving] = useState(false);
 
@@ -27,13 +30,13 @@ const JobForm = ({
     setSaving(true);
 
     if (
-      !formData.locationId ||
+      !formData.addressId ||
       !formData.positionId ||
       !formData.jobTypeId ||
       !formData.statusId
     ) {
       alert(
-        "Please fill in all required fields (Location, Position, Job Type, Status)"
+        "Please fill in all required fields (Address, Position, Job Type, Status)"
       );
       setSaving(false);
       return;
@@ -43,12 +46,13 @@ const JobForm = ({
       title: formData.title,
       description: formData.description,
       jobTypeId: formData.jobTypeId,
-      locationId: formData.locationId,
+      addressId: formData.addressId,
       positionId: formData.positionId,
-      statusId: formData.statusId,
       salaryMin: formData.salaryMin ? parseFloat(formData.salaryMin) : null,
       salaryMax: formData.salaryMax ? parseFloat(formData.salaryMax) : null,
-      recruiterId: null,
+      requiredSkillIds: formData.requiredSkillIds || [],
+      preferredSkillIds: formData.preferredSkillIds || [],
+      qualifications: formData.qualifications || [],
     };
 
     await onSave(jobData);
@@ -157,11 +161,11 @@ const JobForm = ({
               </label>
               <select
                 required
-                value={formData.locationId}
+                value={formData.addressId}
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    locationId: e.target.value,
+                    addressId: e.target.value,
                   }))
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
@@ -376,7 +380,13 @@ const QuickSetup = ({ statusTypes, onRefresh }) => {
 };
 
 const JobsDashboard = () => {
-  const { jobs, lookups, positions, addresses } = useApi();
+  const {
+    jobs,
+    lookups,
+    positions,
+    addresses,
+    jobTypes: jobTypesAPI,
+  } = useApi();
   const [jobsList, setJobsList] = useState([]);
   const [jobTypes, setJobTypes] = useState([]);
   const [statusTypes, setStatusTypes] = useState([]);
@@ -405,8 +415,8 @@ const JobsDashboard = () => {
         addressesData,
       ] = await Promise.all([
         jobs.getAll({}),
-        lookups.getJobTypes(),
-        lookups.getStatusTypes(),
+        jobTypesAPI.getAll(),
+        lookups.getJobStatuses(),
         positions.getAll(),
         addresses.getAll(),
       ]);
@@ -421,11 +431,11 @@ const JobsDashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [jobs, lookups, positions, addresses]);
+  }, [jobs, lookups, positions, addresses, jobTypesAPI]);
 
   useEffect(() => {
     loadInitialData();
-  }, [jobs, lookups, positions, addresses, loadInitialData]);
+  }, [loadInitialData]);
 
   const loadData = async () => {
     try {
@@ -434,8 +444,8 @@ const JobsDashboard = () => {
 
       const [jobsData, jobTypesData, statusTypesData] = await Promise.all([
         jobs.getAll(filters),
-        lookups.getJobTypes(),
-        lookups.getStatusTypes(),
+        jobTypesAPI.getAll(),
+        lookups.getJobStatuses(),
       ]);
 
       setJobsList(jobsData);
@@ -636,11 +646,55 @@ const JobsDashboard = () => {
           </div>
           <div className="divide-y divide-gray-200">
             {jobsList.length === 0 ? (
-              <div className="p-6 text-center text-gray-500">
-                No jobs found.{" "}
-                {filters.recruiterId || filters.statusId || filters.positionId
-                  ? "Try adjusting your filters."
-                  : "Click 'Add New Job' to create your first job posting."}
+              <div className="p-12 text-center">
+                <div className="max-w-md mx-auto">
+                  <div className="bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <svg
+                      className="w-8 h-8 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6.5"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {filters.recruiterId ||
+                    filters.statusId ||
+                    filters.positionId
+                      ? "No jobs match your filters"
+                      : "No jobs created yet"}
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    {filters.recruiterId ||
+                    filters.statusId ||
+                    filters.positionId
+                      ? "Try adjusting your filters to see more results."
+                      : "Get started by creating your first job posting."}
+                  </p>
+                  {filters.recruiterId ||
+                  filters.statusId ||
+                  filters.positionId ? (
+                    <button
+                      onClick={clearFilters}
+                      className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors"
+                    >
+                      Clear Filters
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleCreateJob}
+                      className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      Create First Job
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               jobsList.map((job) => (

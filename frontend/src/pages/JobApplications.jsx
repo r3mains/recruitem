@@ -13,7 +13,7 @@ const JobApplications = () => {
 
   useEffect(() => {
     loadData();
-  }, [jobApplications, lookups]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [jobApplications, lookups]);
 
   const loadData = async () => {
     try {
