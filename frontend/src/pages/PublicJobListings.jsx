@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { useApi } from "../contexts/ApiContext";
+import { jobsAPI, jobTypesAPI } from "../services/api";
 import JobApplicationForm from "../components/JobApplicationForm";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 
 const PublicJobListings = () => {
   const { user } = useAuth();
-  const api = useApi();
   const [jobs, setJobs] = useState([]);
   const [jobTypes, setJobTypes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,16 +28,13 @@ const PublicJobListings = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch("http://localhost:5270/api/jobs/public");
-      const jobsData = await response.json();
+      const jobsResult = await jobsAPI.getPublic();
+      const typesData = await jobTypesAPI.getAll();
 
-      const typesResponse = await fetch(
-        "http://localhost:5270/api/lookups/job-types"
-      );
-      const typesData = await typesResponse.json();
-
-      setJobs(jobsData);
-      setJobTypes(typesData);
+      // Handle both Jobs and jobs properties, and handle paginated response
+      const jobsList = jobsResult.Jobs || jobsResult.jobs || jobsResult || [];
+      setJobs(Array.isArray(jobsList) ? jobsList : []);
+      setJobTypes(Array.isArray(typesData) ? typesData : typesData.jobTypes || []);
     } catch (err) {
       setError(err.message || "Failed to load data");
     } finally {
@@ -56,14 +52,19 @@ const PublicJobListings = () => {
   const applyFilters = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (filters.jobTypeId) params.append("jobTypeId", filters.jobTypeId);
-
-      const response = await fetch(
-        `http://localhost:5270/api/jobs/public?${params.toString()}`
-      );
-      const data = await response.json();
-      setJobs(data);
+      const result = await jobsAPI.getPublic();
+      
+      // Handle both Jobs and jobs properties
+      const allJobs = result.Jobs || result.jobs || result || [];
+      
+      if (filters.jobTypeId) {
+        const filtered = (Array.isArray(allJobs) ? allJobs : []).filter(
+          job => job.jobTypeId === filters.jobTypeId
+        );
+        setJobs(filtered);
+      } else {
+        setJobs(Array.isArray(allJobs) ? allJobs : []);
+      }
     } catch (err) {
       setError(err.message || "Failed to filter jobs");
     } finally {

@@ -41,15 +41,15 @@ const Register = () => {
     const newErrors = {};
 
     if (!formData.email) {
-      newErrors.email = "Email is required";
+      newErrors.email = "Please enter your email address";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid";
+      newErrors.email = "Please enter a valid email address";
     }
 
     if (!formData.password) {
-      newErrors.password = "Password is required";
+      newErrors.password = "Please create a password";
     } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+      newErrors.password = "Password must be at least 6 characters long";
     }
 
     if (!formData.confirmPassword) {
@@ -78,7 +78,30 @@ const Register = () => {
         formData.role
       );
       if (result.success) {
-        navigate("/jobs");
+        // Redirect based on user role - need to wait a bit for user state to update
+        setTimeout(() => {
+          // Get user from localStorage token to determine role
+          const token = localStorage.getItem("token");
+          if (token) {
+            try {
+              const payload = JSON.parse(atob(token.split(".")[1]));
+              const roleClaimKey = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
+              const roleClaim = payload[roleClaimKey];
+              const userRoles = Array.isArray(roleClaim) ? roleClaim : [roleClaim];
+              
+              // Redirect candidates to browse jobs, others to dashboard
+              if (userRoles.includes("Candidate")) {
+                navigate("/browse-jobs");
+              } else {
+                navigate("/dashboard");
+              }
+            } catch (error) {
+              navigate("/");
+            }
+          } else {
+            navigate("/");
+          }
+        }, 100);
       } else {
         setErrors({
           submit: result.error || "Registration failed. Please try again.",

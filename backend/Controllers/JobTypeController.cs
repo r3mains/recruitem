@@ -11,27 +11,19 @@ namespace backend.Controllers;
 [ApiController]
 [Route("[controller]")]
 [ApiVersion("1.0")]
-[Authorize(Policy = "UserPolicy")]
-public class JobTypeController : ControllerBase
+public class JobTypeController(
+  IJobTypeRepository jobTypeRepository,
+  IMapper mapper,
+  CreateJobTypeValidator createJobTypeValidator,
+  UpdateJobTypeValidator updateJobTypeValidator) : ControllerBase
 {
-  private readonly IJobTypeRepository _jobTypeRepository;
-  private readonly IMapper _mapper;
-  private readonly CreateJobTypeValidator _createJobTypeValidator;
-  private readonly UpdateJobTypeValidator _updateJobTypeValidator;
-
-  public JobTypeController(
-    IJobTypeRepository jobTypeRepository,
-    IMapper mapper,
-    CreateJobTypeValidator createJobTypeValidator,
-    UpdateJobTypeValidator updateJobTypeValidator)
-  {
-    _jobTypeRepository = jobTypeRepository;
-    _mapper = mapper;
-    _createJobTypeValidator = createJobTypeValidator;
-    _updateJobTypeValidator = updateJobTypeValidator;
-  }
+  private readonly IJobTypeRepository _jobTypeRepository = jobTypeRepository;
+  private readonly IMapper _mapper = mapper;
+  private readonly CreateJobTypeValidator _createJobTypeValidator = createJobTypeValidator;
+  private readonly UpdateJobTypeValidator _updateJobTypeValidator = updateJobTypeValidator;
 
   [HttpGet]
+  [AllowAnonymous]
   public async Task<ActionResult<IEnumerable<JobTypeListDto>>> GetJobTypes(
     [FromQuery] string? search = null,
     [FromQuery] int page = 1,
@@ -39,7 +31,7 @@ public class JobTypeController : ControllerBase
   {
     if (page < 1 || pageSize < 1 || pageSize > 100)
     {
-      return BadRequest("Page must be >= 1 and PageSize must be between 1 and 100");
+      return BadRequest("Invalid pagination parameters. Page must be 1 or greater, and page size must be between 1 and 100");
     }
 
     var jobTypes = await _jobTypeRepository.GetAllAsync(search, page, pageSize);
@@ -49,12 +41,13 @@ public class JobTypeController : ControllerBase
   }
 
   [HttpGet("{id}")]
+  [AllowAnonymous]
   public async Task<ActionResult<JobTypeResponseDto>> GetJobType(Guid id)
   {
     var jobType = await _jobTypeRepository.GetByIdAsync(id);
     if (jobType == null)
     {
-      return NotFound($"JobType with ID {id} not found");
+      return NotFound($"The job type with ID {id} could not be found");
     }
 
     var jobTypeResponseDto = _mapper.Map<JobTypeResponseDto>(jobType);
@@ -73,7 +66,7 @@ public class JobTypeController : ControllerBase
 
     if (await _jobTypeRepository.ExistsByNameAsync(createJobTypeDto.Type))
     {
-      return BadRequest($"Job type '{createJobTypeDto.Type}' already exists");
+      return BadRequest($"The job type '{createJobTypeDto.Type}' already exists. Please use a different name");
     }
 
     var jobType = _mapper.Map<backend.Models.JobType>(createJobTypeDto);
@@ -96,12 +89,12 @@ public class JobTypeController : ControllerBase
     var existingJobType = await _jobTypeRepository.GetByIdAsync(id);
     if (existingJobType == null)
     {
-      return NotFound($"JobType with ID {id} not found");
+      return NotFound($"The job type with ID {id} could not be found");
     }
 
     if (await _jobTypeRepository.ExistsByNameAsync(updateJobTypeDto.Type, id))
     {
-      return BadRequest($"Job type '{updateJobTypeDto.Type}' already exists");
+      return BadRequest($"The job type '{updateJobTypeDto.Type}' already exists. Please use a different name");
     }
 
     _mapper.Map(updateJobTypeDto, existingJobType);
@@ -118,12 +111,12 @@ public class JobTypeController : ControllerBase
     var jobType = await _jobTypeRepository.GetByIdAsync(id);
     if (jobType == null)
     {
-      return NotFound($"JobType with ID {id} not found");
+      return NotFound($"The job type with ID {id} could not be found");
     }
 
     if (await _jobTypeRepository.IsInUseAsync(id))
     {
-      return BadRequest("Cannot delete job type as it is currently in use by jobs");
+      return BadRequest("This job type cannot be deleted as it is currently being used by jobs. Please remove it from those jobs first");
     }
 
     await _jobTypeRepository.DeleteAsync(id);

@@ -6,43 +6,33 @@ using backend.Models;
 using backend.Repositories.IRepositories;
 using backend.Validators.JobApplicationValidators;
 using backend.Consts;
+using backend.Services.IServices;
 
 namespace backend.Controllers;
 
 [ApiController]
 [Route("[controller]")]
 [ApiVersion("1.0")]
-[Authorize(Policy = "UserPolicy")]
-public class JobApplicationController : ControllerBase
+public class JobApplicationController(
+  IJobApplicationRepository jobApplicationRepository,
+  ICandidateRepository candidateRepository,
+  IJobRepository jobRepository,
+  IMapper mapper,
+  CreateJobApplicationValidator createJobApplicationValidator,
+  UpdateJobApplicationValidator updateJobApplicationValidator,
+  ApplyToJobValidator applyToJobValidator,
+  BulkApplicationActionValidator bulkApplicationActionValidator,
+  IEmailService emailService) : ControllerBase
 {
-  private readonly IJobApplicationRepository _jobApplicationRepository;
-  private readonly ICandidateRepository _candidateRepository;
-  private readonly IJobRepository _jobRepository;
-  private readonly IMapper _mapper;
-  private readonly CreateJobApplicationValidator _createJobApplicationValidator;
-  private readonly UpdateJobApplicationValidator _updateJobApplicationValidator;
-  private readonly ApplyToJobValidator _applyToJobValidator;
-  private readonly BulkApplicationActionValidator _bulkApplicationActionValidator;
-
-  public JobApplicationController(
-    IJobApplicationRepository jobApplicationRepository,
-    ICandidateRepository candidateRepository,
-    IJobRepository jobRepository,
-    IMapper mapper,
-    CreateJobApplicationValidator createJobApplicationValidator,
-    UpdateJobApplicationValidator updateJobApplicationValidator,
-    ApplyToJobValidator applyToJobValidator,
-    BulkApplicationActionValidator bulkApplicationActionValidator)
-  {
-    _jobApplicationRepository = jobApplicationRepository;
-    _candidateRepository = candidateRepository;
-    _jobRepository = jobRepository;
-    _mapper = mapper;
-    _createJobApplicationValidator = createJobApplicationValidator;
-    _updateJobApplicationValidator = updateJobApplicationValidator;
-    _applyToJobValidator = applyToJobValidator;
-    _bulkApplicationActionValidator = bulkApplicationActionValidator;
-  }
+  private readonly IJobApplicationRepository _jobApplicationRepository = jobApplicationRepository;
+  private readonly ICandidateRepository _candidateRepository = candidateRepository;
+  private readonly IJobRepository _jobRepository = jobRepository;
+  private readonly IMapper _mapper = mapper;
+  private readonly CreateJobApplicationValidator _createJobApplicationValidator = createJobApplicationValidator;
+  private readonly UpdateJobApplicationValidator _updateJobApplicationValidator = updateJobApplicationValidator;
+  private readonly ApplyToJobValidator _applyToJobValidator = applyToJobValidator;
+  private readonly BulkApplicationActionValidator _bulkApplicationActionValidator = bulkApplicationActionValidator;
+  private readonly IEmailService _emailService = emailService;
 
   [HttpGet]
   [Authorize(Policy = "ViewCandidates")]
@@ -56,7 +46,7 @@ public class JobApplicationController : ControllerBase
   {
     if (page < 1 || pageSize < 1 || pageSize > 100)
     {
-      return BadRequest("Page must be >= 1 and PageSize must be between 1 and 100");
+      return BadRequest("Invalid pagination parameters. Page must be 1 or greater, and page size must be between 1 and 100");
     }
 
     var applications = await _jobApplicationRepository.GetAllAsync(search, page, pageSize, jobId, candidateId, statusId);
@@ -88,7 +78,7 @@ public class JobApplicationController : ControllerBase
     var application = await _jobApplicationRepository.GetByIdAsync(id);
     if (application == null)
     {
-      return NotFound($"Job application with ID {id} not found");
+      return NotFound($"The job application with ID {id} could not be found");
     }
 
     var applicationResponseDto = _mapper.Map<JobApplicationResponseDto>(application);
@@ -107,19 +97,19 @@ public class JobApplicationController : ControllerBase
 
     if (await _jobApplicationRepository.HasAppliedAsync(createJobApplicationDto.CandidateId, createJobApplicationDto.JobId))
     {
-      return BadRequest("Candidate has already applied to this job");
+      return BadRequest("This candidate has already applied to this job posting");
     }
 
     var job = await _jobRepository.GetJobByIdAsync(createJobApplicationDto.JobId);
     if (job == null)
     {
-      return BadRequest("Invalid job ID");
+      return BadRequest("The specified job posting could not be found. Please verify the job ID");
     }
 
     var candidate = await _candidateRepository.GetByIdAsync(createJobApplicationDto.CandidateId);
     if (candidate == null)
     {
-      return BadRequest("Invalid candidate ID");
+      return BadRequest("The specified candidate profile could not be found. Please verify the candidate ID");
     }
 
     var jobApplication = _mapper.Map<JobApplication>(createJobApplicationDto);
@@ -163,18 +153,18 @@ public class JobApplicationController : ControllerBase
     var candidate = await _candidateRepository.GetByUserIdAsync(userId.Value);
     if (candidate == null)
     {
-      return BadRequest("Candidate profile not found");
+      return BadRequest("Your candidate profile could not be found. Please complete your profile before applying");
     }
 
     if (await _jobApplicationRepository.HasAppliedAsync(candidate.Id, applyToJobDto.JobId))
     {
-      return BadRequest("You have already applied to this job");
+      return BadRequest("You have already applied to this job posting. You cannot submit duplicate applications");
     }
 
     var job = await _jobRepository.GetJobByIdAsync(applyToJobDto.JobId);
     if (job == null || job.IsDeleted)
     {
-      return BadRequest("Job not found or no longer active");
+      return BadRequest("The job posting you're trying to apply to could not be found or is no longer active");
     }
 
     var jobApplication = new JobApplication
@@ -211,7 +201,7 @@ public class JobApplicationController : ControllerBase
     var existingApplication = await _jobApplicationRepository.GetByIdAsync(id);
     if (existingApplication == null)
     {
-      return NotFound($"Job application with ID {id} not found");
+      return NotFound($"The job application with ID {id} could not be found");
     }
 
     var previousStatusId = existingApplication.StatusId;
@@ -225,12 +215,21 @@ public class JobApplicationController : ControllerBase
       existingApplication.UpdatedBy = userId.Value;
     }
 
+    // Update NumberOfInterviewRounds if provided
+    if (updateJobApplicationDto.NumberOfInterviewRounds.HasValue)
+    {
+      existingApplication.NumberOfInterviewRounds = updateJobApplicationDto.NumberOfInterviewRounds.Value;
+    }
+
     var updatedApplication = await _jobApplicationRepository.UpdateAsync(existingApplication);
 
     if (previousStatusId != updateJobApplicationDto.StatusId)
     {
       var newStatus = await GetApplicationStatusByIdAsync(updateJobApplicationDto.StatusId);
       await AddStatusHistoryEntry(id, previousStatus, newStatus?.Status, userId, updateJobApplicationDto.Comment);
+      
+      // Send email notification for status change
+      _ = SendStatusChangeEmailAsync(existingApplication, newStatus?.Status ?? "Updated", updateJobApplicationDto.Comment);
     }
 
     var fullApplication = await _jobApplicationRepository.GetByIdAsync(updatedApplication.Id);
@@ -253,7 +252,7 @@ public class JobApplicationController : ControllerBase
     var applications = await _jobApplicationRepository.GetByIdsAsync(bulkActionDto.ApplicationIds);
     if (!applications.Any())
     {
-      return BadRequest("No valid applications found for the provided IDs");
+      return BadRequest("No valid job applications found for the provided IDs. Please verify your selection");
     }
 
     var userId = GetCurrentUserId();
@@ -270,11 +269,122 @@ public class JobApplicationController : ControllerBase
       }
 
       await AddStatusHistoryEntry(application.Id, previousStatus, newStatus?.Status, userId, bulkActionDto.Comment);
+      
+      // Send email notification for bulk status change
+      _ = SendStatusChangeEmailAsync(application, newStatus?.Status ?? "Updated", bulkActionDto.Comment);
     }
 
     await _jobApplicationRepository.UpdateMultipleAsync(applications);
 
     return Ok(new { message = $"Updated {applications.Count()} applications", updatedCount = applications.Count() });
+  }
+
+  // POST /api/v1/jobapplication/bulk-delete
+  [HttpPost("bulk-delete")]
+  [Authorize(Policy = "ManageCandidates")]
+  public async Task<ActionResult> BulkDeleteApplications([FromBody] List<Guid> applicationIds)
+  {
+    if (applicationIds == null || !applicationIds.Any())
+    {
+      return BadRequest("Application IDs are required");
+    }
+
+    var applications = await _jobApplicationRepository.GetByIdsAsync(applicationIds);
+    if (!applications.Any())
+    {
+      return BadRequest("No valid job applications found for the provided IDs. Please verify your selection");
+    }
+
+    foreach (var application in applications)
+    {
+      await _jobApplicationRepository.DeleteAsync(application.Id);
+    }
+
+    return Ok(new { message = $"Deleted {applications.Count()} applications", deletedCount = applications.Count() });
+  }
+
+  // POST /api/v1/jobapplication/bulk-shortlist
+  [HttpPost("bulk-shortlist")]
+  [Authorize(Policy = "ShortlistCandidates")]
+  public async Task<ActionResult> BulkShortlistApplications([FromBody] List<Guid> applicationIds)
+  {
+    if (applicationIds == null || !applicationIds.Any())
+    {
+      return BadRequest("At least one application ID is required to perform bulk shortlist");
+    }
+
+    var applications = await _jobApplicationRepository.GetByIdsAsync(applicationIds);
+    if (!applications.Any())
+    {
+      return BadRequest("No valid job applications found for the provided IDs. Please verify your selection");
+    }
+
+    var shortlistedStatus = await GetApplicationStatusByNameAsync("Shortlisted");
+    if (shortlistedStatus == null)
+    {
+      return BadRequest("The shortlisted status configuration could not be found. Please contact support");
+    }
+
+    var userId = GetCurrentUserId();
+
+    foreach (var application in applications)
+    {
+      var previousStatus = application.Status?.Status;
+      application.StatusId = shortlistedStatus.Id;
+      
+      if (userId.HasValue)
+      {
+        application.UpdatedBy = userId.Value;
+      }
+
+      await AddStatusHistoryEntry(application.Id, previousStatus, "Shortlisted", userId, "Bulk shortlisted");
+    }
+
+    await _jobApplicationRepository.UpdateMultipleAsync(applications);
+
+    return Ok(new { message = $"Shortlisted {applications.Count()} applications", shortlistedCount = applications.Count() });
+  }
+
+  // POST /api/v1/jobapplication/bulk-reject
+  [HttpPost("bulk-reject")]
+  [Authorize(Policy = "ManageCandidates")]
+  public async Task<ActionResult> BulkRejectApplications([FromBody] BulkApplicationActionDto bulkActionDto)
+  {
+    if (bulkActionDto.ApplicationIds == null || !bulkActionDto.ApplicationIds.Any())
+    {
+      return BadRequest("At least one application ID is required to perform bulk reject");
+    }
+
+    var applications = await _jobApplicationRepository.GetByIdsAsync(bulkActionDto.ApplicationIds);
+    if (!applications.Any())
+    {
+      return BadRequest("No valid job applications found for the provided IDs. Please verify your selection");
+    }
+
+    var rejectedStatus = await GetApplicationStatusByNameAsync("Rejected");
+    if (rejectedStatus == null)
+    {
+      return BadRequest("The rejected status configuration could not be found. Please contact support");
+    }
+
+    var userId = GetCurrentUserId();
+
+    foreach (var application in applications)
+    {
+      var previousStatus = application.Status?.Status;
+      application.StatusId = rejectedStatus.Id;
+      
+      if (userId.HasValue)
+      {
+        application.UpdatedBy = userId.Value;
+      }
+
+      await AddStatusHistoryEntry(application.Id, previousStatus, "Rejected", userId, bulkActionDto.Comment ?? "Bulk rejected");
+    }
+
+    await _jobApplicationRepository.UpdateMultipleAsync(applications);
+
+    return Ok(new { message = $"Rejected {applications.Count()} applications", rejectedCount = applications.Count() });
   }
 
   // GET /api/v1/jobapplication/my-applications
@@ -293,7 +403,7 @@ public class JobApplicationController : ControllerBase
     var candidate = await _candidateRepository.GetByUserIdAsync(userId.Value);
     if (candidate == null)
     {
-      return BadRequest("Candidate profile not found");
+      return BadRequest("Your candidate profile could not be found. Please contact support");
     }
 
     return await GetJobApplications(null, page, pageSize, null, candidate.Id, null);
@@ -309,7 +419,9 @@ public class JobApplicationController : ControllerBase
 
   private Guid? GetCurrentUserId()
   {
-    var userIdClaim = User.FindFirst("sub")?.Value ?? User.FindFirst("id")?.Value;
+    var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+                   ?? User.FindFirst("sub")?.Value 
+                   ?? User.FindFirst("id")?.Value;
     return userIdClaim != null ? Guid.Parse(userIdClaim) : null;
   }
 
@@ -348,5 +460,30 @@ public class JobApplicationController : ControllerBase
     }
 
     await _jobApplicationRepository.AddStatusHistoryAsync(statusHistory);
+  }
+
+  private async Task SendStatusChangeEmailAsync(JobApplication application, string newStatus, string? comments)
+  {
+    try
+    {
+      var candidate = application.Candidate ?? await _candidateRepository.GetByIdAsync(application.CandidateId);
+      var job = application.Job ?? await _jobRepository.GetJobByIdAsync(application.JobId);
+      
+      if (candidate?.User?.Email != null && job != null)
+      {
+        await _emailService.SendApplicationStatusUpdateAsync(
+          candidate.User.Email,
+          candidate.FullName ?? "Candidate",
+          job.Title,
+          newStatus,
+          comments
+        );
+      }
+    }
+    catch (Exception ex)
+    {
+      // Log error but don't fail the request
+      Console.WriteLine($"Failed to send status change email: {ex.Message}");
+    }
   }
 }

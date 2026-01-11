@@ -40,7 +40,7 @@ public class SkillController(ISkillRepository skillRepository, IMapper mapper) :
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error retrieving skills: {ex.Message}");
+      return BadRequest($"Unable to retrieve skills list. Please try again. Details: {ex.Message}");
     }
   }
 
@@ -53,14 +53,14 @@ public class SkillController(ISkillRepository skillRepository, IMapper mapper) :
       var skill = await _skillRepository.GetSkillDetailsByIdAsync(id);
       if (skill == null)
       {
-        return NotFound("Skill not found");
+        return NotFound("The skill you're looking for could not be found");
       }
 
       return Ok(skill);
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error retrieving skill: {ex.Message}");
+      return BadRequest($"Unable to retrieve skill details. Please try again. Details: {ex.Message}");
     }
   }
 
@@ -72,7 +72,7 @@ public class SkillController(ISkillRepository skillRepository, IMapper mapper) :
     {
       if (await _skillRepository.SkillNameExistsAsync(createSkillDto.SkillName))
       {
-        return BadRequest("Skill with this name already exists");
+        return BadRequest($"A skill with the name '{createSkillDto.SkillName}' already exists. Please use a different name");
       }
 
       var skill = _mapper.Map<Skill>(createSkillDto);
@@ -83,7 +83,7 @@ public class SkillController(ISkillRepository skillRepository, IMapper mapper) :
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error creating skill: {ex.Message}");
+      return BadRequest($"Unable to create skill. Please try again or contact support. Details: {ex.Message}");
     }
   }
 
@@ -96,13 +96,13 @@ public class SkillController(ISkillRepository skillRepository, IMapper mapper) :
       var existingSkill = await _skillRepository.GetSkillByIdAsync(id);
       if (existingSkill == null)
       {
-        return NotFound("Skill not found");
+        return NotFound("The skill you're trying to update could not be found");
       }
 
       if (!string.IsNullOrEmpty(updateSkillDto.SkillName) &&
           await _skillRepository.SkillNameExistsAsync(updateSkillDto.SkillName, id))
       {
-        return BadRequest("Skill with this name already exists");
+        return BadRequest($"A skill with the name '{updateSkillDto.SkillName}' already exists. Please use a different name");
       }
 
       if (!string.IsNullOrEmpty(updateSkillDto.SkillName))
@@ -115,7 +115,7 @@ public class SkillController(ISkillRepository skillRepository, IMapper mapper) :
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error updating skill: {ex.Message}");
+      return BadRequest($"Unable to update skill. Please try again or contact support. Details: {ex.Message}");
     }
   }
 
@@ -127,13 +127,13 @@ public class SkillController(ISkillRepository skillRepository, IMapper mapper) :
     {
       if (!await _skillRepository.ExistsAsync(id))
       {
-        return NotFound("Skill not found");
+        return NotFound("The skill you're trying to delete could not be found");
       }
 
       var skillDetails = await _skillRepository.GetSkillDetailsByIdAsync(id);
       if (skillDetails != null && (skillDetails.PositionCount > 0 || skillDetails.JobCount > 0 || skillDetails.CandidateCount > 0))
       {
-        return BadRequest("Cannot delete skill that is currently being used in positions, jobs, or candidate profiles");
+        return BadRequest("This skill cannot be deleted as it is currently being used by positions, jobs, or candidates. Please remove it from those entities first");
       }
 
       await _skillRepository.DeleteSkillAsync(id);
@@ -141,7 +141,7 @@ public class SkillController(ISkillRepository skillRepository, IMapper mapper) :
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error deleting skill: {ex.Message}");
+      return BadRequest($"Unable to delete skill. Please try again or contact support. Details: {ex.Message}");
     }
   }
 }

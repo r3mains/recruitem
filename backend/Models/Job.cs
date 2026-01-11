@@ -17,7 +17,7 @@ public class Job
   public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
   public bool IsDeleted { get; set; } = false;
 
-  // Navigation properties
+
   public virtual Employee Recruiter { get; set; } = null!;
   public virtual JobType JobType { get; set; } = null!;
   public virtual Address Address { get; set; } = null!;

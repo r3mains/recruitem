@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useApi } from "./ApiContext";
+import { getErrorMessage } from "../utils/errorHandler";
 
 const AuthContext = createContext();
 
@@ -27,17 +28,31 @@ export const AuthProvider = ({ children }) => {
 
   const getUserFromToken = async (token) => {
     try {
+      if (!token) {
+        console.error("No token provided to getUserFromToken");
+        setLoading(false);
+        return;
+      }
+      
       const payload = JSON.parse(atob(token.split(".")[1]));
-      const userDetails = await api.users.getById(payload.sub);
-      const roles = await api.roles.getAll();
-      const userRole = roles.find((r) => r.id === userDetails.roleId);
+      
+      // Extract roles from JWT token (role claim can be a string or array)
+      let userRoles = [];
+      const roleClaimKey = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
+      if (payload[roleClaimKey]) {
+        const roleClaim = payload[roleClaimKey];
+        userRoles = Array.isArray(roleClaim) ? roleClaim : [roleClaim];
+      }
 
-      setUser({
-        id: userDetails.id,
-        email: userDetails.email,
-        role: userRole?.name || "Unknown",
-      });
+      const userObject = {
+        id: payload.sub || payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"],
+        email: payload.email || payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"],
+        roles: userRoles,
+        role: userRoles[0] || "Unknown", // Primary role for backward compatibility
+      };
+      setUser(userObject);
     } catch (error) {
+      console.error("Error parsing token:", error);
       localStorage.removeItem("token");
     } finally {
       setLoading(false);
@@ -47,13 +62,17 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await api.auth.login({ email, password });
-      localStorage.setItem("token", response.token);
-      await getUserFromToken(response.token);
+      const token = response.token || response.accessToken;
+      if (!token) {
+        throw new Error("No token received from server");
+      }
+      localStorage.setItem("token", token);
+      await getUserFromToken(token);
       return { success: true };
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.message || "Login failed",
+        error: getErrorMessage(error, "Login failed. Please check your credentials and try again."),
       };
     }
   };
@@ -61,13 +80,17 @@ export const AuthProvider = ({ children }) => {
   const register = async (email, password, role) => {
     try {
       const response = await api.auth.register({ email, password, role });
-      localStorage.setItem("token", response.token);
-      await getUserFromToken(response.token);
+      const token = response.token || response.accessToken;
+      if (!token) {
+        throw new Error("No token received from server");
+      }
+      localStorage.setItem("token", token);
+      await getUserFromToken(token);
       return { success: true };
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.message || "Registration failed",
+        error: getErrorMessage(error, "Registration failed. Please try again."),
       };
     }
   };
@@ -78,11 +101,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   const hasRole = (requiredRoles) => {
-    if (!user) return false;
+    if (!user || !user.roles) return false;
     const roles = Array.isArray(requiredRoles)
       ? requiredRoles
       : [requiredRoles];
-    return roles.includes(user.role);
+    return user.roles.some(userRole => roles.includes(userRole));
   };
 
   const value = {

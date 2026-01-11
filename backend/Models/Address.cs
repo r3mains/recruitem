@@ -9,7 +9,6 @@ public class Address
   public string? Pincode { get; set; }
   public Guid? CityId { get; set; }
 
-  // Navigation properties
   public City? City { get; set; }
   public ICollection<Employee> Employees { get; set; } = [];
   public ICollection<Candidate> Candidates { get; set; } = [];

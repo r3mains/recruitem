@@ -10,4 +10,6 @@ public interface IEmailService
   Task<bool> SendInterviewScheduledEmailAsync(string email, string candidateName, DateTime interviewDate, string jobTitle);
   Task<bool> SendOfferLetterAsync(string email, string candidateName, string jobTitle, string offerDetails);
   Task<bool> SendApplicationStatusUpdateAsync(string email, string candidateName, string jobTitle, string status, string? comments = null);
+  Task<bool> SendEmailWithTemplateAsync(Guid templateId, string toEmail, string? toName, Dictionary<string, string> variables);
+  Task<string> ApplyVariablesToTemplate(string template, Dictionary<string, string> variables);
 }

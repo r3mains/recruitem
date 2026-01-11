@@ -6,8 +6,6 @@ namespace backend.Models
   {
     public Guid Id { get; set; }
 
-    [Required]
-    [MaxLength(50)]
     public string Type { get; set; } = string.Empty;
 
     public ICollection<Interview> Interviews { get; set; } = new List<Interview>();

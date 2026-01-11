@@ -7,20 +7,17 @@ namespace backend.Models
   {
     public Guid Id { get; set; }
 
-    [Required]
     public Guid JobId { get; set; }
     public Job Job { get; set; } = null!;
 
-    [Required]
     public Guid CandidateId { get; set; }
     public Candidate Candidate { get; set; } = null!;
 
-    [Required]
     public Guid StatusId { get; set; }
     public ApplicationStatus Status { get; set; } = null!;
 
-    [Column(TypeName = "decimal(5,2)")]
     public decimal? Score { get; set; }
+    public int? NumberOfInterviewRounds { get; set; }
 
     public DateTime? AppliedAt { get; set; }
     public DateTime? LastUpdated { get; set; }
@@ -35,7 +32,6 @@ namespace backend.Models
 
     public ICollection<ApplicationDocument> ApplicationDocuments { get; set; } = new List<ApplicationDocument>();
     public ICollection<Comment> Comments { get; set; } = new List<Comment>();
-    public ICollection<OnlineTest> OnlineTests { get; set; } = new List<OnlineTest>();
     public ICollection<ApplicationStatusHistory> StatusHistory { get; set; } = new List<ApplicationStatusHistory>();
     public ICollection<Interview> Interviews { get; set; } = new List<Interview>();
   }

@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { useApi } from "../contexts/ApiContext";
+import { applicationsAPI } from "../services/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 
 const JobApplicationForm = ({ job, onClose, onSuccess }) => {
   const { user } = useAuth();
-  const api = useApi();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
@@ -25,16 +24,10 @@ const JobApplicationForm = ({ job, onClose, onSuccess }) => {
       setLoading(true);
       setError(null);
 
-      const applicationData = {
-        jobId: job.id,
-        candidateId: user.candidateId || user.id,
-        coverLetter: formData.coverLetter,
-      };
-
-      await api.applications.create(applicationData);
+      await applicationsAPI.apply(job.id);
       onSuccess?.();
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to submit application");
+      setError(err.response?.data?.message || err.message || "Failed to submit application");
     } finally {
       setLoading(false);
     }

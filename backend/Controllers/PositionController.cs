@@ -14,20 +14,12 @@ namespace backend.Controllers;
 [ApiVersion("1.0")]
 [Route("positions")]
 [Authorize]
-public class PositionController : ControllerBase
+public class PositionController(IPositionRepository positionRepository, IEmployeeRepository employeeRepository, ApplicationDbContext context, IMapper mapper) : ControllerBase
 {
-  private readonly IPositionRepository _positionRepository;
-  private readonly IEmployeeRepository _employeeRepository;
-  private readonly ApplicationDbContext _context;
-  private readonly IMapper _mapper;
-
-  public PositionController(IPositionRepository positionRepository, IEmployeeRepository employeeRepository, ApplicationDbContext context, IMapper mapper)
-  {
-    _positionRepository = positionRepository;
-    _employeeRepository = employeeRepository;
-    _context = context;
-    _mapper = mapper;
-  }
+  private readonly IPositionRepository _positionRepository = positionRepository;
+  private readonly IEmployeeRepository _employeeRepository = employeeRepository;
+  private readonly ApplicationDbContext _context = context;
+  private readonly IMapper _mapper = mapper;
 
   [HttpGet]
   [Authorize(Policy = "ViewJobs")]
@@ -53,7 +45,7 @@ public class PositionController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error retrieving positions: {ex.Message}");
+      return BadRequest($"Unable to retrieve positions. Please try again. Details: {ex.Message}");
     }
   }
 
@@ -66,14 +58,14 @@ public class PositionController : ControllerBase
       var position = await _positionRepository.GetPositionDetailsByIdAsync(id);
       if (position == null)
       {
-        return NotFound("Position not found");
+        return NotFound("The position you're looking for could not be found");
       }
 
       return Ok(position);
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error retrieving position: {ex.Message}");
+      return BadRequest($"Unable to retrieve position details. Please try again. Details: {ex.Message}");
     }
   }
 
@@ -97,7 +89,7 @@ public class PositionController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error creating position: {ex.Message}");
+      return BadRequest($"Unable to create position. Please try again or contact support. Details: {ex.Message}");
     }
   }
 
@@ -110,7 +102,7 @@ public class PositionController : ControllerBase
       var existingPosition = await _positionRepository.GetPositionByIdAsync(id);
       if (existingPosition == null)
       {
-        return NotFound("Position not found");
+        return NotFound("The position you're trying to update could not be found");
       }
 
       if (!string.IsNullOrEmpty(updatePositionDto.Title))
@@ -128,6 +120,9 @@ public class PositionController : ControllerBase
       if (!string.IsNullOrEmpty(updatePositionDto.ClosedReason))
         existingPosition.ClosedReason = updatePositionDto.ClosedReason;
 
+      if (updatePositionDto.SelectedCandidateId.HasValue)
+        existingPosition.SelectedCandidateId = updatePositionDto.SelectedCandidateId;
+
       existingPosition.UpdatedAt = DateTime.UtcNow;
 
       var updatedPosition = await _positionRepository.UpdatePositionAsync(existingPosition);
@@ -142,7 +137,7 @@ public class PositionController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error updating position: {ex.Message}");
+      return BadRequest($"Unable to update position. Please try again or contact support. Details: {ex.Message}");
     }
   }
 
@@ -154,7 +149,7 @@ public class PositionController : ControllerBase
     {
       if (!await _positionRepository.ExistsAsync(id))
       {
-        return NotFound("Position not found");
+        return NotFound("The position you're trying to delete could not be found");
       }
 
       await _positionRepository.DeletePositionAsync(id);
@@ -162,7 +157,7 @@ public class PositionController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error deleting position: {ex.Message}");
+      return BadRequest($"Unable to delete position. Please try again or contact support. Details: {ex.Message}");
     }
   }
 
@@ -175,20 +170,39 @@ public class PositionController : ControllerBase
       var position = await _positionRepository.GetPositionByIdAsync(id);
       if (position == null)
       {
-        return NotFound("Position not found");
+        return NotFound("The position you're trying to close could not be found");
+      }
+
+      // Validate that either a reason or selected candidate is provided
+      if (string.IsNullOrWhiteSpace(request.Reason) && !request.SelectedCandidateId.HasValue)
+      {
+        return BadRequest("Either a closure reason or selected candidate must be provided when closing a position");
+      }
+
+      // If a candidate is selected, verify they exist
+      if (request.SelectedCandidateId.HasValue)
+      {
+        var candidateExists = await _context.Candidates.AnyAsync(c => c.Id == request.SelectedCandidateId.Value && !c.IsDeleted);
+        if (!candidateExists)
+        {
+          return BadRequest("The selected candidate could not be found");
+        }
       }
 
       var closedStatus = await GetPositionStatusByName(Consts.PositionStatus.Closed);
       position.StatusId = closedStatus.Id;
       position.ClosedReason = request.Reason;
+      position.SelectedCandidateId = request.SelectedCandidateId;
       position.UpdatedAt = DateTime.UtcNow;
 
       await _positionRepository.UpdatePositionAsync(position);
-      return Ok(new { message = "Position closed successfully" });
+      
+      var positionDetails = await _positionRepository.GetPositionDetailsByIdAsync(id);
+      return Ok(new { message = "Position closed successfully", position = positionDetails });
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error closing position: {ex.Message}");
+      return BadRequest($"Unable to close position. Please try again. Details: {ex.Message}");
     }
   }
 
@@ -201,7 +215,7 @@ public class PositionController : ControllerBase
       var position = await _positionRepository.GetPositionByIdAsync(id);
       if (position == null)
       {
-        return NotFound("Position not found");
+        return NotFound("The position you're trying to put on hold could not be found");
       }
 
       var holdStatus = await GetPositionStatusByName(Consts.PositionStatus.OnHold);
@@ -214,7 +228,7 @@ public class PositionController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error putting position on hold: {ex.Message}");
+      return BadRequest($"Unable to put position on hold. Please try again. Details: {ex.Message}");
     }
   }
 
@@ -227,12 +241,13 @@ public class PositionController : ControllerBase
       var position = await _positionRepository.GetPositionByIdAsync(id);
       if (position == null)
       {
-        return NotFound("Position not found");
+        return NotFound("The position you're trying to reopen could not be found");
       }
 
       var openStatus = await GetPositionStatusByName(Consts.PositionStatus.Open);
       position.StatusId = openStatus.Id;
       position.ClosedReason = null;
+      position.SelectedCandidateId = null;
       position.UpdatedAt = DateTime.UtcNow;
 
       await _positionRepository.UpdatePositionAsync(position);
@@ -240,7 +255,7 @@ public class PositionController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error reopening position: {ex.Message}");
+      return BadRequest($"Unable to reopen position. Please try again. Details: {ex.Message}");
     }
   }
 
@@ -277,6 +292,7 @@ public class PositionController : ControllerBase
 public class ClosePositionRequest
 {
   public string? Reason { get; set; }
+  public Guid? SelectedCandidateId { get; set; }
 }
 
 public class HoldPositionRequest

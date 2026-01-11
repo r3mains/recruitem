@@ -10,6 +10,7 @@ namespace backend.DTOs.JobApplication
   {
     public Guid StatusId { get; set; }
     public decimal? Score { get; set; }
+    public int? NumberOfInterviewRounds { get; set; }
     public string? Comment { get; set; }
   }
 
@@ -25,6 +26,7 @@ namespace backend.DTOs.JobApplication
     public Guid StatusId { get; set; }
     public string StatusName { get; set; } = string.Empty;
     public decimal? Score { get; set; }
+    public int? NumberOfInterviewRounds { get; set; }
     public DateTime? AppliedAt { get; set; }
     public DateTime? LastUpdated { get; set; }
     public string? CreatedBy { get; set; }
@@ -45,6 +47,7 @@ namespace backend.DTOs.JobApplication
     public string CandidateEmail { get; set; } = string.Empty;
     public string StatusName { get; set; } = string.Empty;
     public decimal? Score { get; set; }
+    public int? NumberOfInterviewRounds { get; set; }
     public DateTime? AppliedAt { get; set; }
     public DateTime? LastUpdated { get; set; }
   }

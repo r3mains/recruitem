@@ -6,15 +6,12 @@ namespace backend.Models
   {
     public Guid Id { get; set; }
 
-    [Required]
     public Guid JobApplicationId { get; set; }
     public JobApplication JobApplication { get; set; } = null!;
 
-    [Required]
     public Guid StatusId { get; set; }
     public ApplicationStatus Status { get; set; } = null!;
 
-    [Required]
     public DateTime ChangedAt { get; set; }
 
     public Guid? ChangedBy { get; set; }

@@ -3,7 +3,8 @@ namespace backend.DTOs;
 // Authentication Request DTOs
 public record RegisterDto(
   string Email,
-  string Password
+  string Password,
+  string? Role = null
 );
 
 public record LoginDto(

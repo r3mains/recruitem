@@ -1,17 +1,29 @@
 using FluentEmail.Core;
 using backend.Services.IServices;
 using backend.Models;
+using backend.Data;
 
 namespace backend.Services;
 
-public class FluentEmailService(IFluentEmail fluentEmail, IConfiguration configuration, ILogger<FluentEmailService> logger) : IEmailService
+public class FluentEmailService(IFluentEmail fluentEmail, IConfiguration configuration, ILogger<FluentEmailService> logger, ApplicationDbContext context) : IEmailService
 {
   private readonly IFluentEmail _fluentEmail = fluentEmail;
   private readonly IConfiguration _configuration = configuration;
   private readonly ILogger<FluentEmailService> _logger = logger;
+  private readonly ApplicationDbContext _context = context;
 
   public async Task<bool> SendEmailAsync(EmailRequest request)
   {
+    var emailLog = new EmailLog
+    {
+      Id = Guid.NewGuid(),
+      ToEmail = request.To,
+      Subject = request.Subject,
+      Body = request.Body,
+      SentAt = DateTime.UtcNow,
+      Status = "Pending"
+    };
+
     try
     {
       var email = _fluentEmail
@@ -27,16 +39,27 @@ public class FluentEmailService(IFluentEmail fluentEmail, IConfiguration configu
 
       if (result.Successful)
       {
+        emailLog.Status = "Sent";
         _logger.LogInformation("Email sent successfully to {Email} via Gmail SMTP", request.To);
+        await _context.EmailLogs.AddAsync(emailLog);
+        await _context.SaveChangesAsync();
         return true;
       }
 
+      emailLog.Status = "Failed";
+      emailLog.ErrorMessage = string.Join(", ", result.ErrorMessages);
       _logger.LogError("Gmail SMTP sending failed: {Errors}", string.Join(", ", result.ErrorMessages));
+      await _context.EmailLogs.AddAsync(emailLog);
+      await _context.SaveChangesAsync();
       return false;
     }
     catch (Exception ex)
     {
+      emailLog.Status = "Failed";
+      emailLog.ErrorMessage = ex.Message;
       _logger.LogError(ex, "Failed to send email via Gmail SMTP to {Email}", request.To);
+      await _context.EmailLogs.AddAsync(emailLog);
+      await _context.SaveChangesAsync();
       return false;
     }
   }
@@ -201,6 +224,54 @@ Comments: {comments}";
 Application Status Update for: {jobTitle}
 
 Status: {status.ToUpper()}{commentsSection}";
+  }
+
+  public async Task<bool> SendEmailWithTemplateAsync(Guid templateId, string toEmail, string? toName, Dictionary<string, string> variables)
+  {
+    try
+    {
+      var template = await _context.EmailTemplates.FindAsync(templateId);
+      if (template == null)
+      {
+        _logger.LogError("Email template not found: {TemplateId}", templateId);
+        return false;
+      }
+
+      if (!template.IsActive)
+      {
+        _logger.LogWarning("Attempted to use inactive template: {TemplateId}", templateId);
+        return false;
+      }
+
+      var subject = ApplyVariablesToTemplate(template.Subject, variables).Result;
+      var body = ApplyVariablesToTemplate(template.Body, variables).Result;
+
+      var emailRequest = new EmailRequest
+      {
+        To = toEmail,
+        ToName = toName ?? toEmail,
+        Subject = subject,
+        Body = body,
+        IsHtml = true
+      };
+
+      return await SendEmailAsync(emailRequest);
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Failed to send email with template {TemplateId} to {Email}", templateId, toEmail);
+      return false;
+    }
+  }
+
+  public Task<string> ApplyVariablesToTemplate(string template, Dictionary<string, string> variables)
+  {
+    var result = template;
+    foreach (var variable in variables)
+    {
+      result = result.Replace($"{{{{{variable.Key}}}}}", variable.Value);
+    }
+    return Task.FromResult(result);
   }
 
   #endregion

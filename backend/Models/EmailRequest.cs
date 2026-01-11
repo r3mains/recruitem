@@ -9,7 +9,7 @@ public class EmailRequest
   public string? ToName { get; set; }
 }
 
-public class EmailTemplate
+public static class EmailTemplateConstants
 {
   public const string PASSWORD_RESET = "password-reset";
   public const string EMAIL_CONFIRMATION = "email-confirmation";

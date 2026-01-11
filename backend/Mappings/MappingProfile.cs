@@ -1,6 +1,10 @@
 using AutoMapper;
 using backend.DTOs;
+using backend.DTOs.Document;
+using backend.DTOs.Event;
 using backend.DTOs.Interview;
+using backend.DTOs.Scoring;
+using backend.DTOs.Verification;
 using backend.Models;
 
 namespace backend.Mappings;
@@ -236,12 +240,11 @@ public class MappingProfile : Profile
       .ForMember(dest => dest.UpdatedByUser, opt => opt.Ignore())
       .ForMember(dest => dest.ApplicationDocuments, opt => opt.Ignore())
       .ForMember(dest => dest.Comments, opt => opt.Ignore())
-      .ForMember(dest => dest.OnlineTests, opt => opt.Ignore())
       .ForMember(dest => dest.StatusHistory, opt => opt.Ignore());
 
     CreateMap<JobApplication, backend.DTOs.JobApplication.JobApplicationResponseDto>()
       .ForMember(dest => dest.JobTitle, opt => opt.MapFrom(src => src.Job.Title))
-      .ForMember(dest => dest.CompanyName, opt => opt.MapFrom(src => "Company Name")) // TODO: Add company info to Job model
+      .ForMember(dest => dest.CompanyName, opt => opt.MapFrom(src => "Internal"))
       .ForMember(dest => dest.CandidateName, opt => opt.MapFrom(src => src.Candidate.FullName))
       .ForMember(dest => dest.CandidateEmail, opt => opt.MapFrom(src => src.Candidate.User.Email))
       .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => src.Status.Status))
@@ -293,6 +296,71 @@ public class MappingProfile : Profile
     CreateMap<InterviewFeedback, InterviewFeedbackDto>();
     CreateMap<CreateInterviewFeedbackDto, InterviewFeedback>();
 
-    CreateMap<InterviewType, InterviewTypeDto>();
+    // Event mappings
+    CreateMap<backend.DTOs.Event.CreateEventDto, Event>()
+      .ForMember(dest => dest.Id, opt => opt.MapFrom(src => Guid.NewGuid()))
+      .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
+      .ForMember(dest => dest.IsDeleted, opt => opt.MapFrom(src => false));
+
+    CreateMap<backend.DTOs.Event.UpdateEventDto, Event>()
+      .ForMember(dest => dest.Id, opt => opt.Ignore())
+      .ForMember(dest => dest.CreatedBy, opt => opt.Ignore())
+      .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+      .ForMember(dest => dest.IsDeleted, opt => opt.Ignore())
+      .ForMember(dest => dest.EventCandidates, opt => opt.Ignore());
+
+    CreateMap<Event, backend.DTOs.Event.EventDto>()
+      .ForMember(dest => dest.CreatedByName, opt => opt.MapFrom(src => src.CreatedByEmployee != null ? src.CreatedByEmployee.FullName : null));
+
+    CreateMap<Event, backend.DTOs.Event.EventListDto>()
+      .ForMember(dest => dest.CandidateCount, opt => opt.MapFrom(src => src.EventCandidates.Count));
+
+    CreateMap<EventCandidate, backend.DTOs.Event.EventCandidateDto>()
+      .ForMember(dest => dest.EventName, opt => opt.MapFrom(src => src.Event != null ? src.Event.Name : null))
+      .ForMember(dest => dest.CandidateName, opt => opt.MapFrom(src => src.Candidate.FullName))
+      .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status != null ? src.Status.Status : null));
+
+    // Verification mappings
+    CreateMap<backend.DTOs.Verification.CreateVerificationDto, Verification>()
+      .ForMember(dest => dest.Id, opt => opt.MapFrom(src => Guid.NewGuid()))
+      .ForMember(dest => dest.VerifiedAt, opt => opt.MapFrom(src => DateTime.UtcNow));
+
+    CreateMap<backend.DTOs.Verification.UpdateVerificationDto, Verification>()
+      .ForMember(dest => dest.Id, opt => opt.Ignore())
+      .ForMember(dest => dest.DocumentId, opt => opt.Ignore())
+      .ForMember(dest => dest.CandidateId, opt => opt.Ignore())
+      .ForMember(dest => dest.VerifiedAt, opt => opt.Ignore())
+      .ForMember(dest => dest.Document, opt => opt.Ignore())
+      .ForMember(dest => dest.Candidate, opt => opt.Ignore())
+      .ForMember(dest => dest.VerifiedByEmployee, opt => opt.Ignore())
+      .ForMember(dest => dest.Status, opt => opt.Ignore());
+
+    CreateMap<Verification, backend.DTOs.Verification.VerificationDto>()
+      .ForMember(dest => dest.DocumentUrl, opt => opt.MapFrom(src => src.Document != null ? src.Document.Url : string.Empty))
+      .ForMember(dest => dest.DocumentType, opt => opt.MapFrom(src => src.Document != null && src.Document.DocumentType != null ? src.Document.DocumentType.Type : string.Empty))
+      .ForMember(dest => dest.CandidateName, opt => opt.MapFrom(src => src.Candidate != null ? src.Candidate.FullName : null))
+      .ForMember(dest => dest.VerifiedByName, opt => opt.MapFrom(src => src.VerifiedByEmployee != null ? src.VerifiedByEmployee.FullName : null))
+      .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status != null ? src.Status.Status : null));
+
+    CreateMap<Verification, backend.DTOs.Verification.VerificationListDto>()
+      .ForMember(dest => dest.CandidateName, opt => opt.MapFrom(src => src.Candidate != null ? src.Candidate.FullName : null))
+      .ForMember(dest => dest.DocumentType, opt => opt.MapFrom(src => src.Document != null && src.Document.DocumentType != null ? src.Document.DocumentType.Type : string.Empty))
+      .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status != null ? src.Status.Status : null));
+
+    // Notification mappings
+    CreateMap<Notification, backend.DTOs.Notification.NotificationDto>();
+
+    // Scoring mappings
+    CreateMap<ScoringConfiguration, ScoringConfigurationDto>();
+    CreateMap<CreateScoringConfigurationDto, ScoringConfiguration>()
+      .ForMember(dest => dest.Id, opt => opt.Ignore())
+      .ForMember(dest => dest.IsDeleted, opt => opt.MapFrom(src => false))
+      .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+      .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
+      .ForMember(dest => dest.Position, opt => opt.Ignore());
+
+    CreateMap<AutomatedScore, AutomatedScoreDto>()
+      .ForMember(dest => dest.CandidateName, opt => opt.Ignore())
+      .ForMember(dest => dest.JobTitle, opt => opt.Ignore());
   }
 }

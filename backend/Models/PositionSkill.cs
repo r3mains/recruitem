@@ -9,7 +9,7 @@ public class PositionSkill
   public Guid PositionId { get; set; }
   public Guid SkillId { get; set; }
 
-  // Navigation properties
+
   public virtual Position Position { get; set; } = null!;
   public virtual Skill Skill { get; set; } = null!;
 }

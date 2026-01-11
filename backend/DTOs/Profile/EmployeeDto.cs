@@ -33,19 +33,20 @@ public record EmployeeDto(
   string? UserName = null
 );
 
-public record EmployeeWithDetailsDto(
-  Guid Id,
-  Guid UserId,
-  string? FullName,
-  DateOnly? JoiningDate,
-  string? OfferLetterUrl,
-  DateTime CreatedAt,
-  DateTime UpdatedAt,
-  bool IsDeleted,
-  string? UserEmail,
-  string? UserName,
-  AddressDto? BranchAddress
-);
+public class EmployeeWithDetailsDto
+{
+  public Guid Id { get; set; }
+  public Guid UserId { get; set; }
+  public string? FullName { get; set; }
+  public DateOnly? JoiningDate { get; set; }
+  public string? OfferLetterUrl { get; set; }
+  public DateTime CreatedAt { get; set; }
+  public DateTime UpdatedAt { get; set; }
+  public bool IsDeleted { get; set; }
+  public string? UserEmail { get; set; }
+  public string? UserName { get; set; }
+  public AddressDto? BranchAddress { get; set; }
+}
 
 public record EmployeeProfileDto(
   Guid Id,

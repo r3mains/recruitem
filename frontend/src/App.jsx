@@ -10,6 +10,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import JobsDashboard from "./pages/JobsDashboard";
+import JobsPage from "./pages/JobsPage";
 import PublicJobListings from "./pages/PublicJobListings";
 import JobDetail from "./pages/JobDetail";
 import JobApplications from "./pages/JobApplications";
@@ -19,6 +20,19 @@ import CandidateProfilePage from "./pages/CandidateProfilePage";
 import ScreeningPage from "./pages/ScreeningPage";
 import InterviewsPage from "./pages/InterviewsPage";
 import LandingPage from "./pages/LandingPage";
+import ResumeParsingPage from "./pages/ResumeParsingPage";
+import EmailTemplatesPage from "./pages/EmailTemplatesPage";
+import DocumentsPage from "./pages/DocumentsPage";
+import EventsPage from "./pages/EventsPage";
+import ReportsPage from "./pages/ReportsPage";
+import VerificationPage from "./pages/VerificationPage";
+import SkillsPage from "./pages/SkillsPage";
+import QualificationsPage from "./pages/QualificationsPage";
+import UserManagementPage from "./pages/UserManagementPage";
+import JobTypesPage from "./pages/JobTypesPage";
+import ProfilePage from "./pages/ProfilePage";
+import ExportPage from "./pages/ExportPage";
+import OfferLettersPage from "./pages/OfferLettersPage";
 
 function App() {
   return (
@@ -66,7 +80,7 @@ function App() {
                       "Reviewer",
                     ]}
                   >
-                    <JobsDashboard />
+                    <JobsPage />
                   </ProtectedRoute>
                 }
               />
@@ -132,19 +146,136 @@ function App() {
               />
 
               <Route
-                path="/profile"
+                path="/applications"
                 element={
                   <ProtectedRoute requiredRoles={["Candidate"]}>
-                    <CandidateProfilePage />
+                    <JobApplications />
                   </ProtectedRoute>
                 }
               />
 
               <Route
-                path="/applications"
+                path="/resume-parser"
                 element={
-                  <ProtectedRoute requiredRoles={["Candidate"]}>
-                    <JobApplications />
+                  <ProtectedRoute requiredRoles={["Admin", "Recruiter", "HR"]}>
+                    <ResumeParsingPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/email-templates"
+                element={
+                  <ProtectedRoute requiredRoles={["Admin", "HR"]}>
+                    <EmailTemplatesPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/documents"
+                element={
+                  <ProtectedRoute requiredRoles={["Admin", "HR", "Recruiter"]}>
+                    <DocumentsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/events"
+                element={
+                  <ProtectedRoute requiredRoles={["Admin", "HR"]}>
+                    <EventsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/reports"
+                element={
+                  <ProtectedRoute requiredRoles={["Admin", "HR"]}>
+                    <ReportsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/verifications"
+                element={
+                  <ProtectedRoute requiredRoles={["Admin", "HR"]}>
+                    <VerificationPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/skills"
+                element={
+                  <ProtectedRoute requiredRoles={["Admin", "HR"]}>
+                    <SkillsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/qualifications"
+                element={
+                  <ProtectedRoute requiredRoles={["Admin"]}>
+                    <QualificationsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/users"
+                element={
+                  <ProtectedRoute requiredRoles={["Admin"]}>
+                    <UserManagementPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/job-types"
+                element={
+                  <ProtectedRoute requiredRoles={["Admin"]}>
+                    <JobTypesPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute
+                    requiredRoles={[
+                      "Admin",
+                      "Recruiter",
+                      "HR",
+                      "Interviewer",
+                      "Reviewer",
+                      "Candidate",
+                    ]}
+                  >
+                    <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/export"
+                element={
+                  <ProtectedRoute requiredRoles={["Admin", "HR", "Recruiter"]}>
+                    <ExportPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/offer-letters"
+                element={
+                  <ProtectedRoute requiredRoles={["Admin", "HR", "Recruiter"]}>
+                    <OfferLettersPage />
                   </ProtectedRoute>
                 }
               />

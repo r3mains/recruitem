@@ -34,7 +34,6 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
   public DbSet<ApplicationDocument> ApplicationDocuments { get; set; }
   public DbSet<JobApplication> JobApplications { get; set; }
   public DbSet<Comment> Comments { get; set; }
-  public DbSet<OnlineTest> OnlineTests { get; set; }
   public DbSet<ApplicationStatusHistory> ApplicationStatusHistory { get; set; }
   public DbSet<Verification> Verifications { get; set; }
   public DbSet<CandidateSkill> CandidateSkills { get; set; }
@@ -45,6 +44,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
   public DbSet<Interviewer> Interviewers { get; set; }
   public DbSet<InterviewSchedule> InterviewSchedules { get; set; }
   public DbSet<InterviewFeedback> InterviewFeedbacks { get; set; }
+  public DbSet<InterviewStatusHistory> InterviewStatusHistory { get; set; }
+
+  public DbSet<Event> Events { get; set; }
+  public DbSet<EventCandidate> EventCandidates { get; set; }
+
+  public DbSet<EmailLog> EmailLogs { get; set; }
+  public DbSet<EmailTemplate> EmailTemplates { get; set; }
+  public DbSet<OfferLetter> OfferLetters { get; set; }
+  public DbSet<Notification> Notifications { get; set; }
+  
+  public DbSet<ScoringConfiguration> ScoringConfigurations { get; set; }
+  public DbSet<AutomatedScore> AutomatedScores { get; set; }
 
   protected override void OnModelCreating(ModelBuilder builder)
   {
@@ -309,17 +320,6 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Cascade);
     });
 
-    builder.Entity<OnlineTest>(entity =>
-    {
-      entity.HasKey(e => e.Id);
-      entity.Property(e => e.Score).HasColumnType("decimal(5,2)");
-
-      entity.HasOne(e => e.JobApplication)
-            .WithMany(ja => ja.OnlineTests)
-            .HasForeignKey(e => e.JobApplicationId)
-            .OnDelete(DeleteBehavior.Cascade);
-    });
-
     builder.Entity<ApplicationStatusHistory>(entity =>
     {
       entity.HasKey(e => e.Id);
@@ -492,6 +492,79 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Cascade);
 
       entity.ToTable(t => t.HasCheckConstraint("CK_InterviewFeedback_Rating", "\"Rating\" >= 1 AND \"Rating\" <= 5"));
+    });
+
+    builder.Entity<InterviewStatusHistory>(entity =>
+    {
+      entity.HasKey(e => e.Id);
+      entity.Property(e => e.ChangedAt).IsRequired();
+      entity.Property(e => e.Note).HasMaxLength(500);
+
+      entity.HasOne(e => e.Interview)
+            .WithMany(i => i.StatusHistory)
+            .HasForeignKey(e => e.InterviewId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+      entity.HasOne(e => e.Status)
+            .WithMany()
+            .HasForeignKey(e => e.StatusId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+      entity.HasOne(e => e.ChangedByUser)
+            .WithMany()
+            .HasForeignKey(e => e.ChangedBy)
+            .OnDelete(DeleteBehavior.SetNull);
+    });
+
+    builder.Entity<Event>(entity =>
+    {
+      entity.HasKey(e => e.Id);
+      entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+      entity.Property(e => e.Type).HasMaxLength(100);
+      entity.Property(e => e.Location).HasMaxLength(500);
+      entity.Property(e => e.Date).IsRequired();
+      entity.Property(e => e.CreatedAt).IsRequired();
+
+      entity.HasOne(e => e.CreatedByEmployee)
+            .WithMany()
+            .HasForeignKey(e => e.CreatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+    });
+
+    builder.Entity<EventCandidate>(entity =>
+    {
+      entity.HasKey(e => e.Id);
+      entity.Property(e => e.RegisteredAt).IsRequired();
+
+      entity.HasOne(e => e.Event)
+            .WithMany(ev => ev.EventCandidates)
+            .HasForeignKey(e => e.EventId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+      entity.HasOne(e => e.Candidate)
+            .WithMany()
+            .HasForeignKey(e => e.CandidateId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+      entity.HasOne(e => e.Status)
+            .WithMany()
+            .HasForeignKey(e => e.StatusId)
+            .OnDelete(DeleteBehavior.Restrict);
+    });
+
+    builder.Entity<EmailLog>(entity =>
+    {
+      entity.HasKey(e => e.Id);
+      entity.Property(e => e.ToEmail).IsRequired().HasMaxLength(255);
+      entity.Property(e => e.Subject).HasMaxLength(500);
+      entity.Property(e => e.TemplateName).HasMaxLength(100);
+      entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+      entity.Property(e => e.SentAt).IsRequired();
+
+      entity.HasOne(e => e.User)
+            .WithMany()
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
     });
   }
 

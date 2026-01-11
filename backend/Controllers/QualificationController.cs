@@ -11,25 +11,16 @@ namespace backend.Controllers;
 [ApiController]
 [Route("[controller]")]
 [ApiVersion("1.0")]
-[Authorize(Policy = "UserPolicy")]
-public class QualificationController : ControllerBase
+public class QualificationController(
+  IQualificationRepository qualificationRepository,
+  IMapper mapper,
+  CreateQualificationValidator createQualificationValidator,
+  UpdateQualificationValidator updateQualificationValidator) : ControllerBase
 {
-  private readonly IQualificationRepository _qualificationRepository;
-  private readonly IMapper _mapper;
-  private readonly CreateQualificationValidator _createQualificationValidator;
-  private readonly UpdateQualificationValidator _updateQualificationValidator;
-
-  public QualificationController(
-    IQualificationRepository qualificationRepository,
-    IMapper mapper,
-    CreateQualificationValidator createQualificationValidator,
-    UpdateQualificationValidator updateQualificationValidator)
-  {
-    _qualificationRepository = qualificationRepository;
-    _mapper = mapper;
-    _createQualificationValidator = createQualificationValidator;
-    _updateQualificationValidator = updateQualificationValidator;
-  }
+  private readonly IQualificationRepository _qualificationRepository = qualificationRepository;
+  private readonly IMapper _mapper = mapper;
+  private readonly CreateQualificationValidator _createQualificationValidator = createQualificationValidator;
+  private readonly UpdateQualificationValidator _updateQualificationValidator = updateQualificationValidator;
 
   [HttpGet]
   public async Task<ActionResult<IEnumerable<QualificationListDto>>> GetQualifications(
@@ -39,7 +30,7 @@ public class QualificationController : ControllerBase
   {
     if (page < 1 || pageSize < 1 || pageSize > 100)
     {
-      return BadRequest("Page must be >= 1 and PageSize must be between 1 and 100");
+      return BadRequest("Invalid pagination parameters. Page must be 1 or greater, and page size must be between 1 and 100");
     }
 
     var qualifications = await _qualificationRepository.GetAllAsync(search, page, pageSize);
@@ -54,7 +45,7 @@ public class QualificationController : ControllerBase
     var qualification = await _qualificationRepository.GetByIdAsync(id);
     if (qualification == null)
     {
-      return NotFound($"Qualification with ID {id} not found");
+      return NotFound($"The qualification with ID {id} could not be found");
     }
 
     var qualificationResponseDto = _mapper.Map<QualificationResponseDto>(qualification);
@@ -73,7 +64,7 @@ public class QualificationController : ControllerBase
 
     if (await _qualificationRepository.ExistsByNameAsync(createQualificationDto.QualificationName))
     {
-      return BadRequest($"Qualification '{createQualificationDto.QualificationName}' already exists");
+      return BadRequest($"The qualification '{createQualificationDto.QualificationName}' already exists. Please use a different name");
     }
 
     var qualification = _mapper.Map<backend.Models.Qualification>(createQualificationDto);
@@ -96,12 +87,12 @@ public class QualificationController : ControllerBase
     var existingQualification = await _qualificationRepository.GetByIdAsync(id);
     if (existingQualification == null)
     {
-      return NotFound($"Qualification with ID {id} not found");
+      return NotFound($"The qualification with ID {id} could not be found");
     }
 
     if (await _qualificationRepository.ExistsByNameAsync(updateQualificationDto.QualificationName, id))
     {
-      return BadRequest($"Qualification '{updateQualificationDto.QualificationName}' already exists");
+      return BadRequest($"The qualification '{updateQualificationDto.QualificationName}' already exists. Please use a different name");
     }
 
     _mapper.Map(updateQualificationDto, existingQualification);
@@ -118,12 +109,12 @@ public class QualificationController : ControllerBase
     var qualification = await _qualificationRepository.GetByIdAsync(id);
     if (qualification == null)
     {
-      return NotFound($"Qualification with ID {id} not found");
+      return NotFound($"The qualification with ID {id} could not be found");
     }
 
     if (await _qualificationRepository.IsInUseAsync(id))
     {
-      return BadRequest("Cannot delete qualification as it is currently in use by jobs or candidates");
+      return BadRequest("This qualification cannot be deleted as it is currently being used by jobs or candidates. Please remove it from those entities first");
     }
 
     await _qualificationRepository.DeleteAsync(id);

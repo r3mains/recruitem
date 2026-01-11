@@ -7,29 +7,29 @@ namespace backend;
 
 public class ConfigureSwaggerOptions(IApiVersionDescriptionProvider provider) : IConfigureOptions<SwaggerGenOptions>
 {
-  private readonly IApiVersionDescriptionProvider _provider = provider;
+    private readonly IApiVersionDescriptionProvider _provider = provider;
 
-  public void Configure(SwaggerGenOptions options)
-  {
-    foreach (var description in _provider.ApiVersionDescriptions)
+    public void Configure(SwaggerGenOptions options)
     {
-      options.SwaggerDoc(description.GroupName, new OpenApiInfo
-      {
-        Title = $"Recruitem API {description.ApiVersion}",
-        Version = description.ApiVersion.ToString()
-      });
-    }
+        foreach (var description in _provider.ApiVersionDescriptions)
+        {
+            options.SwaggerDoc(description.GroupName, new OpenApiInfo
+            {
+                Title = $"Recruitem API {description.ApiVersion}",
+                Version = description.ApiVersion.ToString()
+            });
+        }
 
-    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-      Description = "JWT Authorization header using the Bearer scheme",
-      Name = "Authorization",
-      In = ParameterLocation.Header,
-      Type = SecuritySchemeType.ApiKey,
-      Scheme = "Bearer"
-    });
+        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Description = "JWT Authorization header using the Bearer scheme",
+            Name = "Authorization",
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.ApiKey,
+            Scheme = "Bearer"
+        });
 
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
       {
         new OpenApiSecurityScheme
@@ -43,5 +43,5 @@ public class ConfigureSwaggerOptions(IApiVersionDescriptionProvider provider) : 
         new string[] { }
       }
     });
-  }
+    }
 }

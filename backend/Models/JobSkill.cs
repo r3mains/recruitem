@@ -7,7 +7,7 @@ public class JobSkill
   public Guid SkillId { get; set; }
   public bool Required { get; set; } = false;
 
-  // Navigation properties
+
   public virtual Job Job { get; set; } = null!;
   public virtual Skill Skill { get; set; } = null!;
 }

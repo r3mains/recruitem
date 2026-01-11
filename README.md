@@ -1,1 +1,1 @@
-![DB-design](/backend/db-design.png)
+![DB Design](./backend/db-design.png)

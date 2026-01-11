@@ -6,6 +6,8 @@ namespace backend.DTOs.Position
     public string Title { get; set; } = string.Empty;
     public int NumberOfInterviews { get; set; }
     public string? ClosedReason { get; set; }
+    public Guid? SelectedCandidateId { get; set; }
+    public PositionSelectedCandidateDto? SelectedCandidate { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -33,6 +35,13 @@ namespace backend.DTOs.Position
   {
     public Guid Id { get; set; }
     public string SkillName { get; set; } = string.Empty;
+  }
+
+  public class PositionSelectedCandidateDto
+  {
+    public Guid Id { get; set; }
+    public string? FullName { get; set; }
+    public string? Email { get; set; }
   }
 
   public class PositionListDto

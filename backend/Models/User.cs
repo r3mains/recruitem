@@ -8,7 +8,6 @@ public class User : IdentityUser<Guid>
   public DateTimeOffset? UpdatedAt { get; set; }
   public bool IsDeleted { get; set; }
 
-  // Navigation properties
   public Employee? Employee { get; set; }
   public Candidate? Candidate { get; set; }
   public ICollection<Document> UploadedDocuments { get; set; } = new List<Document>();

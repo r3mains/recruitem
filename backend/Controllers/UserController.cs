@@ -20,14 +20,41 @@ public class UserController(IUserRepository userRepository) : ControllerBase
     return Ok(result);
   }
 
+  // GET /api/v1/users/roles
+  [HttpGet("roles")]
+  [AllowAnonymous]
+  public IActionResult GetAllRoles()
+  {
+    var roles = new[]
+    {
+      backend.Consts.Roles.Admin,
+      backend.Consts.Roles.HR,
+      backend.Consts.Roles.Recruiter,
+      backend.Consts.Roles.Interviewer,
+      backend.Consts.Roles.Reviewer,
+      backend.Consts.Roles.Candidate,
+      backend.Consts.Roles.Viewer
+    };
+    return Ok(roles);
+  }
+
   // GET /api/v1/users/{id}
   [HttpGet("{id}")]
+  [Authorize]
   public async Task<IActionResult> GetUser(string id)
   {
+    var currentUserId = User.FindFirst("sub")?.Value;
+    
+    // Allow users to view their own profile, or admins to view any profile
+    if (id != currentUserId && !User.IsInRole("Admin") && !User.IsInRole("HR") && !User.IsInRole("Viewer"))
+    {
+      return Forbid();
+    }
+
     var user = await _userRepository.GetUserByIdAsync(id);
     if (user == null)
     {
-      return NotFound(new { message = "User not found." });
+      return NotFound(new { message = "The requested user could not be found." });
     }
 
     return Ok(user);
@@ -39,7 +66,7 @@ public class UserController(IUserRepository userRepository) : ControllerBase
     var user = await _userRepository.GetUserByEmailAsync(email);
     if (user == null)
     {
-      return NotFound(new { message = "User not found." });
+      return NotFound(new { message = "No user found with this email address." });
     }
 
     return Ok(user);
@@ -52,10 +79,11 @@ public class UserController(IUserRepository userRepository) : ControllerBase
     var result = await _userRepository.CreateUserAsync(request);
     if (!result.Succeeded)
     {
-      return BadRequest(result.Errors);
+      var errors = result.Errors.Select(e => e.Description).ToList();
+      return BadRequest(new { message = "Unable to create user. " + string.Join(" ", errors), errors });
     }
 
-    return Ok(new { message = "User created successfully." });
+    return Ok(new { message = "User account created successfully." });
   }
 
   // PUT /api/v1/users/{id}
@@ -66,10 +94,11 @@ public class UserController(IUserRepository userRepository) : ControllerBase
     var result = await _userRepository.UpdateUserAsync(id, request);
     if (!result.Succeeded)
     {
-      return BadRequest(result.Errors);
+      var errors = result.Errors.Select(e => e.Description).ToList();
+      return BadRequest(new { message = "Unable to update user. " + string.Join(" ", errors), errors });
     }
 
-    return Ok(new { message = "User updated successfully." });
+    return Ok(new { message = "User information updated successfully." });
   }
 
   // DELETE /api/v1/users/{id}
@@ -80,10 +109,11 @@ public class UserController(IUserRepository userRepository) : ControllerBase
     var result = await _userRepository.DeleteUserAsync(id);
     if (!result.Succeeded)
     {
-      return BadRequest(result.Errors);
+      var errors = result.Errors.Select(e => e.Description).ToList();
+      return BadRequest(new { message = "Unable to delete user. " + string.Join(" ", errors), errors });
     }
 
-    return Ok(new { message = "User deleted successfully." });
+    return Ok(new { message = "User account has been deleted successfully." });
   }
 
   // POST /api/v1/users/{id}/restore
@@ -94,10 +124,11 @@ public class UserController(IUserRepository userRepository) : ControllerBase
     var result = await _userRepository.RestoreUserAsync(id);
     if (!result.Succeeded)
     {
-      return BadRequest(result.Errors);
+      var errors = result.Errors.Select(e => e.Description).ToList();
+      return BadRequest(new { message = "Unable to restore user. " + string.Join(" ", errors), errors });
     }
 
-    return Ok(new { message = "User restored successfully." });
+    return Ok(new { message = "User account has been restored successfully." });
   }
 
   [HttpGet("{id}/roles")]
@@ -115,10 +146,11 @@ public class UserController(IUserRepository userRepository) : ControllerBase
     var result = await _userRepository.AssignRoleAsync(request);
     if (!result.Succeeded)
     {
-      return BadRequest(result.Errors);
+      var errors = result.Errors.Select(e => e.Description).ToList();
+      return BadRequest(new { message = $"Unable to assign role '{request.Role}'. " + string.Join(" ", errors), errors });
     }
 
-    return Ok(new { message = $"Role '{request.Role}' assigned successfully." });
+    return Ok(new { message = $"The role '{request.Role}' has been assigned to the user successfully." });
   }
 
   // POST /api/v1/users/remove-role
@@ -129,10 +161,11 @@ public class UserController(IUserRepository userRepository) : ControllerBase
     var result = await _userRepository.RemoveRoleAsync(request);
     if (!result.Succeeded)
     {
-      return BadRequest(result.Errors);
+      var errors = result.Errors.Select(e => e.Description).ToList();
+      return BadRequest(new { message = $"Unable to remove role '{request.Role}'. " + string.Join(" ", errors), errors });
     }
 
-    return Ok(new { message = $"Role '{request.Role}' removed successfully." });
+    return Ok(new { message = $"The role '{request.Role}' has been removed from the user successfully." });
   }
 
   [HttpPut("{id}/roles")]

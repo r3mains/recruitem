@@ -31,16 +31,16 @@ public record CandidateDto(
 );
 
 public record CandidateWithDetailsDto(
-  Guid Id,
-  Guid UserId,
-  string? FullName,
-  string? ContactNumber,
-  DateTime CreatedAt,
-  DateTime UpdatedAt,
-  bool IsDeleted,
-  string? UserEmail,
-  string? UserName,
-  AddressDto? Address
+  Guid Id = default,
+  Guid UserId = default,
+  string? FullName = null,
+  string? ContactNumber = null,
+  DateTime CreatedAt = default,
+  DateTime UpdatedAt = default,
+  bool IsDeleted = false,
+  string? UserEmail = null,
+  string? UserName = null,
+  AddressDto? Address = null
 );
 
 public record CandidateProfileDto(

@@ -7,6 +7,7 @@ namespace backend.DTOs.Position
     public Guid? StatusId { get; set; }
     public Guid? ReviewerId { get; set; }
     public string? ClosedReason { get; set; }
+    public Guid? SelectedCandidateId { get; set; }
     public List<PositionSkillDto>? Skills { get; set; }
   }
 }

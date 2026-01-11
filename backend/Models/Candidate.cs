@@ -6,12 +6,13 @@ public class Candidate
   public Guid UserId { get; set; }
   public string? FullName { get; set; }
   public string? ContactNumber { get; set; }
+  public string? College { get; set; }
+  public int? GraduationYear { get; set; }
   public Guid? AddressId { get; set; }
   public DateTime CreatedAt { get; set; }
   public DateTime UpdatedAt { get; set; }
   public bool IsDeleted { get; set; } = false;
 
-  // Navigation properties
   public User User { get; set; } = null!;
   public Address? Address { get; set; }
   public ICollection<Document> Documents { get; set; } = new List<Document>();

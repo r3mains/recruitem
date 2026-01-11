@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useApi } from "../contexts/ApiContext";
+import { useAuth } from "../contexts/AuthContext";
 
 const JobApplications = () => {
   const { applications: jobApplications, lookups } = useApi();
+  const { user } = useAuth();
   const [applications, setApplications] = useState([]);
   const [statusTypes, setStatusTypes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +52,7 @@ const JobApplications = () => {
 
   const updateApplicationStatus = async (applicationId, statusId) => {
     try {
-      await jobApplications.update(applicationId, { statusId });
+      await jobApplications.updateStatus(applicationId, { statusId });
       loadData();
     } catch (err) {
       console.error("Error updating application status:", err);
@@ -180,22 +182,24 @@ const JobApplications = () => {
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         {getStatusName(application.statusId)}
                       </span>
-                      <select
-                        value={application.statusId}
-                        onChange={(e) =>
-                          updateApplicationStatus(
-                            application.id,
-                            e.target.value
-                          )
-                        }
-                        className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
-                      >
-                        {statusTypes.map((status) => (
-                          <option key={status.id} value={status.id}>
-                            {status.status}
-                          </option>
-                        ))}
-                      </select>
+                      {user?.role !== "Candidate" && (
+                        <select
+                          value={application.statusId}
+                          onChange={(e) =>
+                            updateApplicationStatus(
+                              application.id,
+                              e.target.value
+                            )
+                          }
+                          className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        >
+                          {statusTypes.map((status) => (
+                            <option key={status.id} value={status.id}>
+                              {status.status}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   </div>
                 </div>

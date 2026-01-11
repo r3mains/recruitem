@@ -49,10 +49,22 @@ var logger = new LoggerConfiguration()
 builder.Logging.ClearProviders();
 builder.Logging.AddSerilog(logger);
 
-// Controllers with global version route prefix
+// Controllers
 builder.Services.AddControllers(options =>
 {
   options.Conventions.Insert(0, new RoutePrefixConvention(new RouteAttribute("api/v{version:apiVersion}")));
+});
+
+// CORS
+builder.Services.AddCors(options =>
+{
+  options.AddPolicy("AllowFrontend", policy =>
+  {
+    policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
+          .AllowAnyMethod()
+          .AllowAnyHeader()
+          .AllowCredentials();
+  });
 });
 
 // Validation
@@ -60,6 +72,7 @@ builder.Services.AddFluentValidationAutoValidation(options => options.DisableDat
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 
 // Database
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
                       ?? Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
                       ?? throw new InvalidOperationException("Database connection string not found in configuration or environment variables.");
@@ -83,6 +96,7 @@ builder.Services.AddScoped<backend.Repositories.IRepositories.IUserRepository, b
 builder.Services.AddScoped<backend.Repositories.IRepositories.IProfileRepository, backend.Repositories.ProfileRepository>();
 builder.Services.AddScoped<backend.Repositories.IRepositories.IJobRepository, backend.Repositories.JobRepository>();
 builder.Services.AddScoped<backend.Repositories.IRepositories.IEmployeeRepository, backend.Repositories.EmployeeRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IAddressRepository, backend.Repositories.AddressRepository>();
 builder.Services.AddScoped<backend.Repositories.IRepositories.IPositionRepository, backend.Repositories.PositionRepository>();
 builder.Services.AddScoped<backend.Repositories.IRepositories.ISkillRepository, backend.Repositories.SkillRepository>();
 builder.Services.AddScoped<backend.Repositories.IRepositories.IJobTypeRepository, backend.Repositories.JobTypeRepository>();
@@ -90,6 +104,23 @@ builder.Services.AddScoped<backend.Repositories.IRepositories.IQualificationRepo
 builder.Services.AddScoped<backend.Repositories.IRepositories.ICandidateRepository, backend.Repositories.CandidateRepository>();
 builder.Services.AddScoped<backend.Repositories.IRepositories.IJobApplicationRepository, backend.Repositories.JobApplicationRepository>();
 builder.Services.AddScoped<backend.Repositories.IRepositories.IScreeningRepository, backend.Repositories.ScreeningRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IInterviewRepository, backend.Repositories.InterviewRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IEventRepository, backend.Repositories.EventRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IVerificationRepository, backend.Repositories.VerificationRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IDocumentRepository, backend.Repositories.DocumentRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IReportsRepository, backend.Repositories.ReportsRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IEmailTemplateRepository, backend.Repositories.EmailTemplateRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.IOfferLetterRepository, backend.Repositories.OfferLetterRepository>();
+builder.Services.AddScoped<backend.Repositories.IRepositories.INotificationRepository, backend.Repositories.NotificationRepository>();
+
+// Services
+builder.Services.AddScoped<backend.Services.IServices.IFileStorageService, backend.Services.LocalFileStorageService>();
+builder.Services.AddScoped<backend.Services.IServices.IExportService, backend.Services.ExportService>();
+builder.Services.AddScoped<backend.Services.IServices.IResumeParserService, backend.Services.ResumeParserService>();
+builder.Services.AddScoped<backend.Services.IServices.IPdfGenerationService, backend.Services.PdfGenerationService>();
+builder.Services.AddScoped<backend.Services.IServices.ICandidateBulkImportService, backend.Services.CandidateBulkImportService>();
+builder.Services.AddScoped<backend.Services.IServices.IScoringService, backend.Services.ScoringService>();
+builder.Services.AddScoped<backend.Services.IServices.INotificationService, backend.Services.NotificationService>();
 
 // FluentEmail
 var emailHost = builder.Configuration["Email:Host"] ?? Environment.GetEnvironmentVariable("SMTP_HOST") ?? "smtp.gmail.com";
@@ -123,13 +154,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
       ValidateIssuerSigningKey = true,
       ValidIssuer = jwtIssuer,
       ValidAudience = jwtAudience,
-      IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+      IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+      RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
     };
   });
 
 // Authorization with RBAC Policies
 builder.Services.AddAuthorization(options =>
 {
+  options.AddPolicy("AdminPolicy", policy => policy.RequireRole(Roles.Admin));
   options.AddPolicy("ManageJobs", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter));
   options.AddPolicy("ViewJobs", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Reviewer, Roles.Candidate, Roles.Viewer));
   options.AddPolicy("CloseJobs", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter, Roles.HR));
@@ -141,10 +174,12 @@ builder.Services.AddAuthorization(options =>
   options.AddPolicy("AssignReviewers", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter));
   options.AddPolicy("ShortlistCandidates", policy => policy.RequireRole(Roles.Admin, Roles.Reviewer, Roles.Recruiter));
   options.AddPolicy("ScheduleInterviews", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter, Roles.HR));
+  options.AddPolicy("ViewInterviews", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Viewer));
   options.AddPolicy("ConductInterviews", policy => policy.RequireRole(Roles.Admin, Roles.Interviewer, Roles.HR));
   options.AddPolicy("AddInterviewFeedback", policy => policy.RequireRole(Roles.Admin, Roles.Interviewer, Roles.HR));
   options.AddPolicy("ViewInterviewFeedback", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Viewer));
   options.AddPolicy("AssignInterviewers", policy => policy.RequireRole(Roles.Admin, Roles.Recruiter, Roles.HR));
+  options.AddPolicy("ManageEvents", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter));
   options.AddPolicy("VerifyDocuments", policy => policy.RequireRole(Roles.Admin, Roles.HR));
   options.AddPolicy("BackgroundVerification", policy => policy.RequireRole(Roles.Admin, Roles.HR));
   options.AddPolicy("FinalSelection", policy => policy.RequireRole(Roles.Admin, Roles.HR));
@@ -154,7 +189,7 @@ builder.Services.AddAuthorization(options =>
   options.AddPolicy("HoldProfiles", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer));
   options.AddPolicy("ManageUsers", policy => policy.RequireRole(Roles.Admin));
   options.AddPolicy("ManageRoles", policy => policy.RequireRole(Roles.Admin));
-  options.AddPolicy("ViewUsers", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Viewer));
+  options.AddPolicy("ViewUsers", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Viewer));
   options.AddPolicy("ViewReports", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Viewer));
   options.AddPolicy("GenerateReports", policy => policy.RequireRole(Roles.Admin, Roles.HR));
   options.AddPolicy("ViewDashboard", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Reviewer));
@@ -162,7 +197,14 @@ builder.Services.AddAuthorization(options =>
   options.AddPolicy("TakeExams", policy => policy.RequireRole(Roles.Candidate));
   options.AddPolicy("ViewExamResults", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Reviewer));
   options.AddPolicy("CandidatePortal", policy => policy.RequireRole(Roles.Candidate));
-  options.AddPolicy("UploadDocuments", policy => policy.RequireRole(Roles.Candidate));
+  options.AddPolicy("ManageSettings", policy => policy.RequireRole(Roles.Admin, Roles.HR));
+  options.AddPolicy("ViewSettings", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter));
+  options.AddPolicy("SendEmails", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter));
+  options.AddPolicy("ViewOfferLetters", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Candidate));
+  options.AddPolicy("ManageOfferLetters", policy => policy.RequireRole(Roles.Admin, Roles.HR));
+  options.AddPolicy("UploadDocuments", policy => policy.RequireRole(Roles.Candidate, Roles.Admin, Roles.HR, Roles.Recruiter));
+  options.AddPolicy("ViewDocuments", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Reviewer, Roles.Viewer, Roles.Candidate));
+  options.AddPolicy("ManageDocuments", policy => policy.RequireRole(Roles.Admin, Roles.HR));
   options.AddPolicy("ViewJobOpenings", policy => policy.RequireRole(Roles.Admin, Roles.HR, Roles.Recruiter, Roles.Interviewer, Roles.Reviewer, Roles.Candidate, Roles.Viewer));
   options.AddPolicy("SystemConfig", policy => policy.RequireRole(Roles.Admin));
   options.AddPolicy("ViewLogs", policy => policy.RequireRole(Roles.Admin));
@@ -211,6 +253,9 @@ if (app.Environment.IsDevelopment())
 
 // Global Exception Handler
 app.UseMiddleware<GlobalExceptionHandler>();
+
+// CORS
+app.UseCors("AllowFrontend");
 
 // HTTPS Redirection
 app.UseHttpsRedirection();

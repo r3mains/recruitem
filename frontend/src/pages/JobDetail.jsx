@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { jobsAPI, jobTypesAPI } from "../services/api";
 import JobApplicationForm from "../components/JobApplicationForm";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
@@ -20,20 +21,13 @@ const JobDetail = () => {
       setLoading(true);
       setError(null);
 
-      const [jobResponse, typesResponse] = await Promise.all([
-        fetch(`http://localhost:5270/api/jobs/${id}`),
-        fetch("http://localhost:5270/api/lookups/job-types"),
+      const [jobData, typesData] = await Promise.all([
+        jobsAPI.getPublicById(id),
+        jobTypesAPI.getAll(),
       ]);
 
-      if (!jobResponse.ok) {
-        throw new Error("Job not found");
-      }
-
-      const jobData = await jobResponse.json();
-      const typesData = await typesResponse.json();
-
       setJob(jobData);
-      setJobTypes(typesData);
+      setJobTypes(Array.isArray(typesData) ? typesData : typesData.jobTypes || []);
     } catch (err) {
       setError(err.message || "Failed to load job details");
     } finally {

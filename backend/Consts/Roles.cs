@@ -8,6 +8,7 @@ namespace backend.Consts
     public const string Reviewer = "Reviewer";
     public const string Admin = "Admin";
     public const string Candidate = "Candidate";
+    public const string CANDIDATE = "Candidate";
     public const string Viewer = "Viewer";
   }
 }

@@ -19,6 +19,12 @@ public sealed class RoutePrefixConvention(IRouteTemplateProvider route) : IAppli
       {
         foreach (var selector in selectorsWithAttributeRoute)
         {
+          // Skip if the route already contains "api/v" (already has the prefix)
+          if (selector.AttributeRouteModel?.Template?.Contains("api/v") == true)
+          {
+            continue;
+          }
+          
           selector.AttributeRouteModel = AttributeRouteModel.CombineAttributeRouteModel(_routePrefix, selector.AttributeRouteModel);
         }
       }

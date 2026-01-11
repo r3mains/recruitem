@@ -1,351 +1,706 @@
 import React, { useState, useEffect } from "react";
-import { useApi } from "../contexts/ApiContext";
+import { screeningAPI, positionsAPI, applicationsAPI } from "../services/api";
+import { useAuth } from "../contexts/AuthContext";
+import toast, { Toaster } from "react-hot-toast";
 
 const ScreeningPage = () => {
-  const { lookups, screening } = useApi();
   const [applications, setApplications] = useState([]);
-  const [statusTypes, setStatusTypes] = useState([]);
+  const [positions, setPositions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [filters, setFilters] = useState({
-    jobId: "",
-    statusId: "",
-  });
-  const [selectedApplications, setSelectedApplications] = useState([]);
-  const [bulkAction, setBulkAction] = useState("");
+  const [search, setSearch] = useState("");
+  const [positionFilter, setPositionFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [selectedApplication, setSelectedApplication] = useState(null);
+  const [showScreenModal, setShowScreenModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showShortlistModal, setShowShortlistModal] = useState(false);
+  const { hasRole } = useAuth();
+
+  const limit = 10;
 
   useEffect(() => {
-    loadData();
+    loadInitialData();
   }, []);
 
-  const loadData = async () => {
+  useEffect(() => {
+    loadApplications();
+  }, [page, positionFilter]);
+
+  const loadInitialData = async () => {
+    try {
+      const positionsData = await positionsAPI.getAll();
+      setPositions(positionsData.positions || positionsData || []);
+    } catch (error) {
+      console.error("Error loading positions:", error);
+    }
+  };
+
+  const loadApplications = async () => {
     try {
       setLoading(true);
-      setError(null);
+      const params = {
+        page,
+        pageSize: limit,
+      };
+      if (search) params.search = search;
+      if (positionFilter) params.positionId = positionFilter;
 
-      const [applicationsData, statusTypesData] = await Promise.all([
-        screening.getApplicationsForScreening(),
-        lookups.getStatusTypes(),
-      ]);
-
-      setApplications(applicationsData);
-      setStatusTypes(
-        statusTypesData.filter((st) => st.context === "application")
-      );
-    } catch (err) {
-      setError(err.message || "Failed to load data");
+      const response = await screeningAPI.getApplicationsForScreening(params);
+      setApplications(response.applications || []);
+    } catch (error) {
+      console.error("Error loading applications:", error);
+      toast.error("Failed to load applications");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFilterChange = (field, value) => {
-    setFilters({ ...filters, [field]: value });
+  const handleSearch = () => {
+    setPage(1);
+    loadApplications();
   };
 
-  const applyFilters = async () => {
+  const clearFilters = () => {
+    setSearch("");
+    setPositionFilter("");
+    setPage(1);
+    setTimeout(loadApplications, 0);
+  };
+
+  const openScreenModal = (application) => {
+    console.log("Opening screen modal for application:", application);
+    setSelectedApplication(application);
+    setShowScreenModal(true);
+  };
+
+  const openViewModal = async (application) => {
     try {
-      setLoading(true);
-      const data = await screening.getApplicationsForScreening(filters);
-      setApplications(data);
-    } catch (err) {
-      setError(err.message || "Failed to filter applications");
-    } finally {
-      setLoading(false);
+      console.log("Application data:", application);
+      // Use 'id' instead of 'jobApplicationId'
+      const appId = application.id || application.jobApplicationId;
+      if (!appId || appId === '00000000-0000-0000-0000-000000000000') {
+        toast.error("Invalid application ID");
+        return;
+      }
+      const fullApp = await applicationsAPI.getById(appId);
+      console.log("Full application data:", fullApp);
+      setSelectedApplication(fullApp);
+      setShowViewModal(true);
+    } catch (error) {
+      console.error("Error loading application:", error);
+      toast.error("Failed to load application details");
     }
   };
 
-  const handleScreenApplication = async (applicationId, action) => {
-    try {
-      const statusId = statusTypes.find((st) => st.status === action)?.id;
-      if (!statusId) return;
-
-      await screening.screenApplication(applicationId, {
-        statusId,
-        notes: `Application ${action.toLowerCase()}`,
-      });
-
-      await loadData();
-    } catch (err) {
-      setError(err.message || "Failed to screen application");
-    }
+  const openShortlistModal = (application) => {
+    console.log("Opening shortlist modal for application:", application);
+    setSelectedApplication(application);
+    setShowShortlistModal(true);
   };
 
-  const handleBulkAction = async () => {
-    if (!bulkAction || selectedApplications.length === 0) return;
-
-    try {
-      const statusId = statusTypes.find((st) => st.status === bulkAction)?.id;
-      if (!statusId) return;
-
-      await screening.bulkScreenApplications({
-        applicationIds: selectedApplications,
-        statusId,
-        notes: `Bulk ${bulkAction.toLowerCase()}`,
-      });
-
-      await loadData();
-      setSelectedApplications([]);
-      setBulkAction("");
-    } catch (err) {
-      setError(err.message || "Failed to perform bulk action");
-    }
+  const closeModals = () => {
+    setShowScreenModal(false);
+    setShowViewModal(false);
+    setShowShortlistModal(false);
+    setSelectedApplication(null);
   };
 
-  const handleCalculateScore = async (applicationId) => {
-    try {
-      const score = await screening.calculateScore(applicationId);
-      alert(`Calculated Score: ${score.toFixed(2)}`);
-    } catch (err) {
-      setError(err.message || "Failed to calculate score");
-    }
-  };
-
-  const handleSelectApplication = (applicationId) => {
-    setSelectedApplications((prev) =>
-      prev.includes(applicationId)
-        ? prev.filter((id) => id !== applicationId)
-        : [...prev, applicationId]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedApplications.length === applications.length) {
-      setSelectedApplications([]);
-    } else {
-      setSelectedApplications(applications.map((app) => app.id));
-    }
-  };
-
-  if (loading) {
+  if (!hasRole(["Admin", "Recruiter", "HR", "Reviewer"])) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading applications...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-red-600">{error}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Application Screening
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Review and manage job applications
+      <div className="p-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
+          <p className="text-gray-600">
+            You don't have permission to screen applications.
           </p>
         </div>
+      </div>
+    );
+  }
 
-        <div className="bg-white rounded-lg shadow mb-6">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Filters
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
-                <select
-                  value={filters.statusId}
-                  onChange={(e) => handleFilterChange("statusId", e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                >
-                  <option value="">All Statuses</option>
-                  {statusTypes.map((status) => (
-                    <option key={status.id} value={status.id}>
-                      {status.status}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-end">
-                <button
-                  onClick={applyFilters}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  Apply Filters
-                </button>
-              </div>
-            </div>
+  const getStatusBadge = (status) => {
+    const colors = {
+      Pending: "bg-yellow-100 text-yellow-800",
+      Approved: "bg-green-100 text-green-800",
+      Rejected: "bg-red-100 text-red-800",
+      Shortlisted: "bg-blue-100 text-blue-800",
+      Screening: "bg-purple-100 text-purple-800",
+    };
+    return colors[status] || "bg-gray-100 text-gray-800";
+  };
+
+  return (
+    <div className="p-6">
+      <Toaster position="top-right" />
+
+      <div className="mb-6 flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Resume Screening</h1>
+      </div>
+
+      {/* Search/Filter */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium mb-2">
+              Search Candidate
+            </label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Candidate name..."
+              className="w-full border rounded px-3 py-2"
+              onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Position</label>
+            <select
+              value={positionFilter}
+              onChange={(e) => setPositionFilter(e.target.value)}
+              className="w-full border rounded px-3 py-2"
+            >
+              <option value="">All Positions</option>
+              {positions.map((pos) => (
+                <option key={pos.id} value={pos.id}>
+                  {pos.title}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-end gap-2">
+            <button
+              onClick={handleSearch}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Search
+            </button>
+            <button
+              onClick={clearFilters}
+              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+            >
+              Clear
+            </button>
           </div>
         </div>
+      </div>
 
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Applications ({applications.length})
-              </h2>
-              {selectedApplications.length > 0 && (
-                <div className="flex items-center space-x-4">
-                  <select
-                    value={bulkAction}
-                    onChange={(e) => setBulkAction(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="">Select Action</option>
-                    <option value="Accepted">Accept</option>
-                    <option value="Rejected">Reject</option>
-                    <option value="Shortlisted">Shortlist</option>
-                  </select>
-                  <button
-                    onClick={handleBulkAction}
-                    disabled={!bulkAction}
-                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    Apply to Selected ({selectedApplications.length})
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
+      {loading ? (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        </div>
+      ) : (
+        <>
+          {/* Applications Table */}
+          <div className="bg-white shadow rounded-lg overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      checked={
-                        selectedApplications.length === applications.length &&
-                        applications.length > 0
-                      }
-                      onChange={handleSelectAll}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Candidate
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Job
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Position / Job
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Applied Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Score
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Applied Date
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {applications.map((application) => (
-                  <tr
-                    key={application.id}
-                    className={
-                      selectedApplications.includes(application.id)
-                        ? "bg-blue-50"
-                        : "hover:bg-gray-50"
-                    }
-                  >
-                    <td className="px-6 py-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedApplications.includes(application.id)}
-                        onChange={() => handleSelectApplication(application.id)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {application.candidateName}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {application.candidateEmail}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {application.jobTitle}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          application.statusName === "Applied"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : application.statusName === "Shortlisted"
-                            ? "bg-green-100 text-green-800"
-                            : application.statusName === "Rejected"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {application.statusName}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(application.appliedAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {application.score ? (
-                        <span className="font-medium">
-                          {application.score.toFixed(1)}
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleCalculateScore(application.id)}
-                          className="text-blue-600 hover:text-blue-800 text-sm"
-                        >
-                          Calculate
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <button
-                        onClick={() =>
-                          handleScreenApplication(application.id, "Accepted")
-                        }
-                        className="text-green-600 hover:text-green-900"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleScreenApplication(application.id, "Rejected")
-                        }
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleScreenApplication(application.id, "Shortlisted")
-                        }
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Shortlist
-                      </button>
+                {applications.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                      No applications found for screening
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  applications.map((app) => (
+                    <tr key={app.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="font-medium text-gray-900">
+                          {app.candidateName}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {app.candidateEmail}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">
+                          {app.jobTitle}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {app.positionTitle}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 text-xs rounded-full ${getStatusBadge(
+                            app.status
+                          )}`}
+                        >
+                          {app.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {app.score ? `${app.score}/100` : "Not scored"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(app.appliedAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => openViewModal(app)}
+                          className="text-blue-600 hover:text-blue-900 mr-3"
+                        >
+                          View
+                        </button>
+                        {app.status !== "Shortlisted" && (
+                          <>
+                            <button
+                              onClick={() => openScreenModal(app)}
+                              className="text-green-600 hover:text-green-900 mr-3"
+                            >
+                              Screen
+                            </button>
+                            <button
+                              onClick={() => openShortlistModal(app)}
+                              className="text-purple-600 hover:text-purple-900"
+                            >
+                              Shortlist
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
 
-          {applications.length === 0 && (
-            <div className="p-6 text-center text-gray-500">
-              No applications found for screening.
+          {/* Pagination */}
+          <div className="flex justify-center mt-6 gap-2">
+            <button
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              className="px-4 py-2 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Previous
+            </button>
+            <span className="px-4 py-2">Page {page}</span>
+            <button
+              onClick={() => setPage(page + 1)}
+              disabled={applications.length < limit}
+              className="px-4 py-2 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Next
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Modals */}
+      {showScreenModal && (
+        <ScreenModal
+          application={selectedApplication}
+          onClose={closeModals}
+          onSuccess={() => {
+            closeModals();
+            loadApplications();
+          }}
+        />
+      )}
+
+      {showViewModal && (
+        <ViewApplicationModal
+          application={selectedApplication}
+          onClose={closeModals}
+        />
+      )}
+
+      {showShortlistModal && (
+        <ShortlistModal
+          application={selectedApplication}
+          onClose={closeModals}
+          onSuccess={() => {
+            closeModals();
+            loadApplications();
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// Screen Modal
+const ScreenModal = ({ application, onClose, onSuccess }) => {
+  const [formData, setFormData] = useState({
+    score: "",
+    comments: "",
+    approved: false,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+
+    try {
+      const payload = {
+        jobApplicationId: application.jobApplicationId,
+        score: formData.score ? parseFloat(formData.score) : null,
+        comments: formData.comments,
+        approved: formData.approved,
+      };
+
+      await fetch("http://localhost:5153/api/v1/screening/screen", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      toast.success("Application screened successfully");
+      onSuccess();
+    } catch (error) {
+      console.error("Error screening application:", error);
+      toast.error("Failed to screen application");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg w-11/12 md:w-1/2 max-h-screen overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Screen Application</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-2xl"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mb-4 p-4 bg-gray-50 rounded">
+          <h3 className="font-medium mb-2">Application Details</h3>
+          <div className="text-sm space-y-1">
+            <p>
+              <span className="font-medium">Candidate:</span>{" "}
+              {application.candidateName}
+            </p>
+            <p>
+              <span className="font-medium">Job:</span> {application.jobTitle}
+            </p>
+            <p>
+              <span className="font-medium">Position:</span>{" "}
+              {application.positionTitle}
+            </p>
+            <p>
+              <span className="font-medium">Current Status:</span>{" "}
+              <span className={`px-2 py-1 text-xs rounded ${
+                application.status === "Approved" ? "bg-green-100 text-green-800" :
+                application.status === "Rejected" ? "bg-red-100 text-red-800" :
+                "bg-yellow-100 text-yellow-800"
+              }`}>
+                {application.status}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Score (0-100)
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={formData.score}
+              onChange={(e) =>
+                setFormData({ ...formData, score: e.target.value })
+              }
+              placeholder="Enter score..."
+              className="w-full border rounded px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Comments</label>
+            <textarea
+              value={formData.comments}
+              onChange={(e) =>
+                setFormData({ ...formData, comments: e.target.value })
+              }
+              rows="4"
+              placeholder="Add screening comments..."
+              className="w-full border rounded px-3 py-2"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="approved"
+              checked={formData.approved}
+              onChange={(e) =>
+                setFormData({ ...formData, approved: e.target.checked })
+              }
+              className="rounded"
+            />
+            <label htmlFor="approved" className="text-sm font-medium">
+              Approve this application
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border rounded hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+            >
+              {saving ? "Screening..." : "Submit Screening"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// View Application Modal
+const ViewApplicationModal = ({ application, onClose }) => {
+  if (!application) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg w-11/12 md:w-2/3 max-h-screen overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Application Details</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-2xl"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold mb-3">Candidate Information</h3>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-medium">Name:</span>{" "}
+                {application.candidateName || "N/A"}
+              </div>
+              <div>
+                <span className="font-medium">Email:</span>{" "}
+                {application.candidateEmail || "N/A"}
+              </div>
+              <div>
+                <span className="font-medium">Phone:</span>{" "}
+                {application.candidatePhone || "N/A"}
+              </div>
+              <div>
+                <span className="font-medium">Applied:</span>{" "}
+                {application.appliedAt ? new Date(application.appliedAt).toLocaleDateString() : "N/A"}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold mb-3">Job Information</h3>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-medium">Job Title:</span>{" "}
+                {application.jobTitle || "N/A"}
+              </div>
+              <div>
+                <span className="font-medium">Position:</span>{" "}
+                {application.positionTitle || "N/A"}
+              </div>
+              <div>
+                <span className="font-medium">Status:</span>{" "}
+                <span
+                  className={`px-2 py-1 text-xs rounded ${
+                    application.statusName === "Approved" || application.status === "Approved"
+                      ? "bg-green-100 text-green-800"
+                      : application.statusName === "Rejected" || application.status === "Rejected"
+                      ? "bg-red-100 text-red-800"
+                      : "bg-yellow-100 text-yellow-800"
+                  }`}
+                >
+                  {application.statusName || application.status || "N/A"}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium">Company:</span>{" "}
+                {application.companyName || "N/A"}
+              </div>
+            </div>
+          </div>
+
+          {application.score && (
+            <div>
+              <h3 className="text-lg font-semibold mb-3">Screening Results</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Score:</span> {application.score}
+                  /100
+                </div>
+                <div>
+                  <span className="font-medium">Interview Rounds:</span>{" "}
+                  {application.numberOfInterviewRounds || 0}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {application.comments && Array.isArray(application.comments) && application.comments.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-3">Comments</h3>
+              <div className="space-y-2">
+                {application.comments.map((comment, index) => (
+                  <div
+                    key={comment.id || index}
+                    className="bg-gray-50 p-3 rounded text-sm"
+                  >
+                    <p className="text-gray-700">{comment.comment || comment.text || "No comment"}</p>
+                    <div className="mt-2 text-xs text-gray-500">
+                      {comment.commenterName && `By ${comment.commenterName}`}
+                      {comment.createdAt && ` on ${new Date(comment.createdAt).toLocaleString()}`}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
+
+        <div className="flex justify-end pt-4 border-t mt-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Shortlist Modal
+const ShortlistModal = ({ application, onClose, onSuccess }) => {
+  const [comments, setComments] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+
+    try {
+      const payload = {
+        jobApplicationId: application.jobApplicationId,
+        comments,
+      };
+
+      await fetch("http://localhost:5153/api/v1/screening/shortlist", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      toast.success("Application shortlisted successfully");
+      onSuccess();
+    } catch (error) {
+      console.error("Error shortlisting application:", error);
+      toast.error("Failed to shortlist application");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg w-11/12 md:w-1/2">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Shortlist Candidate</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-2xl"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mb-4 p-4 bg-gray-50 rounded">
+          <p className="text-sm">
+            <span className="font-medium">Candidate:</span>{" "}
+            {application.candidateName}
+          </p>
+          <p className="text-sm">
+            <span className="font-medium">Job:</span> {application.jobTitle}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Comments (Optional)
+            </label>
+            <textarea
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              rows="4"
+              placeholder="Add comments about why this candidate is being shortlisted..."
+              className="w-full border rounded px-3 py-2"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border rounded hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:opacity-50"
+            >
+              {saving ? "Shortlisting..." : "Shortlist Candidate"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

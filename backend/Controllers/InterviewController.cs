@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
+using FluentValidation;
 using backend.Repositories.IRepositories;
 using backend.DTOs.Interview;
+using backend.Services.IServices;
 
 namespace backend.Controllers;
 
@@ -10,14 +12,24 @@ namespace backend.Controllers;
 [ApiVersion("1.0")]
 [Route("interviews")]
 [Authorize]
-public class InterviewController : ControllerBase
+public class InterviewController(
+  IInterviewRepository interviewRepository,
+  IValidator<CreateInterviewDto> createInterviewValidator,
+  IValidator<CreateInterviewScheduleDto> createScheduleValidator,
+  IValidator<CreateInterviewFeedbackDto> createFeedbackValidator,
+  IEmailService emailService,
+  IJobApplicationRepository jobApplicationRepository,
+  ICandidateRepository candidateRepository,
+  IEmployeeRepository employeeRepository) : ControllerBase
 {
-  private readonly IInterviewRepository _interviewRepository;
-
-  public InterviewController(IInterviewRepository interviewRepository)
-  {
-    _interviewRepository = interviewRepository;
-  }
+  private readonly IInterviewRepository _interviewRepository = interviewRepository;
+  private readonly IValidator<CreateInterviewDto> _createInterviewValidator = createInterviewValidator;
+  private readonly IValidator<CreateInterviewScheduleDto> _createScheduleValidator = createScheduleValidator;
+  private readonly IValidator<CreateInterviewFeedbackDto> _createFeedbackValidator = createFeedbackValidator;
+  private readonly IEmailService _emailService = emailService;
+  private readonly IJobApplicationRepository _jobApplicationRepository = jobApplicationRepository;
+  private readonly ICandidateRepository _candidateRepository = candidateRepository;
+  private readonly IEmployeeRepository _employeeRepository = employeeRepository;
 
   [HttpGet]
   [Authorize(Policy = "ViewInterviews")]
@@ -42,7 +54,7 @@ public class InterviewController : ControllerBase
     {
       var interview = await _interviewRepository.GetInterviewByIdAsync(id);
       if (interview == null)
-        return NotFound(new { message = "Interview not found." });
+        return NotFound(new { message = "The interview schedule could not be found" });
 
       return Ok(interview);
     }
@@ -73,12 +85,51 @@ public class InterviewController : ControllerBase
   {
     try
     {
-      if (!ModelState.IsValid)
-        return BadRequest(ModelState);
+      var validationResult = await _createInterviewValidator.ValidateAsync(dto);
+      if (!validationResult.IsValid)
+      {
+        var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
+        return BadRequest(new { message = "Unable to schedule interview. " + string.Join(" ", errors), errors });
+      }
 
       var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
       if (userId == null)
-        return Unauthorized();
+        return Unauthorized(new { message = "Your session has expired. Please log in again." });
+
+      // Check for previous interviews before scheduling
+      var currentApplication = await _jobApplicationRepository.GetByIdAsync(dto.JobApplicationId);
+      if (currentApplication != null)
+      {
+        var candidate = await _candidateRepository.GetByIdAsync(currentApplication.CandidateId);
+        var previousApplications = await _jobApplicationRepository.GetAllAsync(
+          candidateId: currentApplication.CandidateId,
+          pageSize: 1000);
+        var previousInterviews = previousApplications
+          .Where(app => app.Id != currentApplication.Id)
+          .SelectMany(app => app.Interviews)
+          .ToList();
+
+        if (previousInterviews.Any())
+        {
+          // Send email notification to scheduler about previous interview history
+          var schedulerEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+          var schedulerName = User.FindFirst(ClaimTypes.Name)?.Value;
+          
+          if (!string.IsNullOrEmpty(schedulerEmail))
+          {
+            var previousCount = previousInterviews.Count;
+            _ = Task.Run(async () => await _emailService.SendEmailAsync(new backend.Models.EmailRequest
+            {
+              To = schedulerEmail,
+              ToName = schedulerName,
+              Subject = $"Previous Interview History Alert - {candidate?.FullName}",
+              Body = $"<p>Note: This candidate <strong>{candidate?.FullName}</strong> has been interviewed previously for {previousCount} other position(s).</p>" +
+                     $"<p>Please review their previous interview history and feedback before proceeding with the current interview.</p>",
+              IsHtml = true
+            }));
+          }
+        }
+      }
 
       var interview = await _interviewRepository.CreateInterviewAsync(dto, Guid.Parse(userId));
       return CreatedAtAction(nameof(GetInterview), new { id = interview.Id }, interview);
@@ -95,12 +146,10 @@ public class InterviewController : ControllerBase
   {
     try
     {
-      if (!ModelState.IsValid)
-        return BadRequest(ModelState);
 
       var interview = await _interviewRepository.UpdateInterviewAsync(id, dto);
       if (interview == null)
-        return NotFound(new { message = "Interview not found." });
+        return NotFound(new { message = "The interview schedule could not be found" });
 
       return Ok(interview);
     }
@@ -118,7 +167,7 @@ public class InterviewController : ControllerBase
     {
       var success = await _interviewRepository.DeleteInterviewAsync(id);
       if (!success)
-        return NotFound(new { message = "Interview not found." });
+        return NotFound(new { message = "The interview schedule could not be found" });
 
       return NoContent();
     }
@@ -151,7 +200,7 @@ public class InterviewController : ControllerBase
     {
       var schedule = await _interviewRepository.GetScheduleByIdAsync(scheduleId);
       if (schedule == null)
-        return NotFound(new { message = "Interview schedule not found." });
+        return NotFound(new { message = "The interview schedule could not be found" });
 
       return Ok(schedule);
     }
@@ -167,14 +216,22 @@ public class InterviewController : ControllerBase
   {
     try
     {
-      if (!ModelState.IsValid)
-        return BadRequest(ModelState);
+      var validationResult = await _createScheduleValidator.ValidateAsync(dto);
+      if (!validationResult.IsValid)
+      {
+        var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
+        return BadRequest(new { message = "Unable to create interview schedule. " + string.Join(" ", errors), errors });
+      }
 
       var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
       if (userId == null)
-        return Unauthorized();
+        return Unauthorized(new { message = "Your session has expired. Please log in again." });
 
       var schedule = await _interviewRepository.CreateScheduleAsync(dto, Guid.Parse(userId));
+      
+      // Send email notification for interview schedule
+      _ = SendInterviewScheduleEmailAsync(dto.InterviewId, schedule.ScheduledAt);
+      
       return CreatedAtAction(nameof(GetSchedule), new { scheduleId = schedule.Id }, schedule);
     }
     catch (Exception ex)
@@ -189,12 +246,10 @@ public class InterviewController : ControllerBase
   {
     try
     {
-      if (!ModelState.IsValid)
-        return BadRequest(ModelState);
 
       var schedule = await _interviewRepository.UpdateScheduleAsync(scheduleId, dto);
       if (schedule == null)
-        return NotFound(new { message = "Interview schedule not found." });
+        return NotFound(new { message = "The interview schedule could not be found" });
 
       return Ok(schedule);
     }
@@ -212,7 +267,7 @@ public class InterviewController : ControllerBase
     {
       var success = await _interviewRepository.DeleteScheduleAsync(scheduleId);
       if (!success)
-        return NotFound(new { message = "Interview schedule not found." });
+        return NotFound(new { message = "The interview schedule could not be found" });
 
       return NoContent();
     }
@@ -245,7 +300,7 @@ public class InterviewController : ControllerBase
     {
       var feedback = await _interviewRepository.GetFeedbackByIdAsync(feedbackId);
       if (feedback == null)
-        return NotFound(new { message = "Interview feedback not found." });
+        return NotFound(new { message = "The interview feedback could not be found" });
 
       return Ok(feedback);
     }
@@ -261,14 +316,22 @@ public class InterviewController : ControllerBase
   {
     try
     {
-      if (!ModelState.IsValid)
-        return BadRequest(ModelState);
+      var validationResult = await _createFeedbackValidator.ValidateAsync(dto);
+      if (!validationResult.IsValid)
+      {
+        var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
+        return BadRequest(new { message = "Unable to submit interview feedback. " + string.Join(" ", errors), errors });
+      }
 
       var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
       if (userId == null)
-        return Unauthorized();
+        return Unauthorized(new { message = "Your session has expired. Please log in again." });
+      // Resolve current user to an employee record (FeedbackBy must be Employee.Id)
+      var employee = await _employeeRepository.GetEmployeeByUserIdAsync(Guid.Parse(userId));
+      if (employee == null)
+        return BadRequest(new { message = "Unable to submit interview feedback. Your user is not linked to an employee record." });
 
-      var feedback = await _interviewRepository.CreateFeedbackAsync(dto, Guid.Parse(userId));
+      var feedback = await _interviewRepository.CreateFeedbackAsync(dto, employee.Id);
       return CreatedAtAction(nameof(GetFeedback), new { feedbackId = feedback.Id }, feedback);
     }
     catch (Exception ex)
@@ -283,12 +346,10 @@ public class InterviewController : ControllerBase
   {
     try
     {
-      if (!ModelState.IsValid)
-        return BadRequest(ModelState);
 
       var feedback = await _interviewRepository.UpdateFeedbackAsync(feedbackId, dto);
       if (feedback == null)
-        return NotFound(new { message = "Interview feedback not found." });
+        return NotFound(new { message = "The interview feedback could not be found" });
 
       return Ok(feedback);
     }
@@ -306,7 +367,7 @@ public class InterviewController : ControllerBase
     {
       var success = await _interviewRepository.DeleteFeedbackAsync(feedbackId);
       if (!success)
-        return NotFound(new { message = "Interview feedback not found." });
+        return NotFound(new { message = "The interview feedback could not be found" });
 
       return NoContent();
     }
@@ -345,12 +406,12 @@ public class InterviewController : ControllerBase
     {
       var updateDto = new UpdateInterviewDto
       {
-        StatusId = GetStatusIdByName("In Progress")
+        StatusId = new Guid("50000000-0000-0000-0000-000000000002")
       };
 
       var interview = await _interviewRepository.UpdateInterviewAsync(interviewId, updateDto);
       if (interview == null)
-        return NotFound(new { message = "Interview not found." });
+        return NotFound(new { message = "The interview schedule could not be found" });
 
       return Ok(new { message = "Interview status updated to 'In Progress'", interview });
     }
@@ -360,3 +421,30 @@ public class InterviewController : ControllerBase
     }
   }
 
+  private async Task SendInterviewScheduleEmailAsync(Guid interviewId, DateTime scheduledAt)
+  {
+    try
+    {
+      var interview = await _interviewRepository.GetInterviewByIdAsync(interviewId);
+      if (interview == null) return;
+
+      var application = await _jobApplicationRepository.GetByIdAsync(interview.JobApplicationId);
+      if (application == null) return;
+
+      var candidate = await _candidateRepository.GetByIdAsync(application.CandidateId);
+      if (candidate?.User?.Email == null) return;
+
+      await _emailService.SendInterviewScheduledEmailAsync(
+        candidate.User.Email,
+        candidate.FullName ?? "Candidate",
+        scheduledAt,
+        interview.JobTitle ?? "Position"
+      );
+    }
+    catch (Exception ex)
+    {
+      // Log error but don't fail the request
+      Console.WriteLine($"Failed to send interview schedule email: {ex.Message}");
+    }
+  }
+}

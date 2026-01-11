@@ -26,7 +26,7 @@ public class ProfileController(IProfileRepository profileRepository) : Controlle
     var profile = await _profileRepository.GetEmployeeProfileAsync(userId);
     if (profile == null)
     {
-      return NotFound(new { message = "Employee profile not found." });
+      return NotFound(new { message = "Your employee profile could not be found. Please contact support" });
     }
 
     return Ok(profile);
@@ -39,7 +39,7 @@ public class ProfileController(IProfileRepository profileRepository) : Controlle
     var profile = await _profileRepository.GetEmployeeProfileAsync(userId);
     if (profile == null)
     {
-      return NotFound(new { message = "Employee profile not found." });
+      return NotFound(new { message = "The employee profile could not be found" });
     }
 
     return Ok(profile);
@@ -114,7 +114,7 @@ public class ProfileController(IProfileRepository profileRepository) : Controlle
     var profile = await _profileRepository.GetCandidateProfileAsync(userId);
     if (profile == null)
     {
-      return NotFound(new { message = "Candidate profile not found." });
+      return NotFound(new { message = "Your candidate profile could not be found. Please contact support" });
     }
 
     return Ok(profile);
@@ -127,7 +127,7 @@ public class ProfileController(IProfileRepository profileRepository) : Controlle
     var profile = await _profileRepository.GetCandidateProfileAsync(userId);
     if (profile == null)
     {
-      return NotFound(new { message = "Candidate profile not found." });
+      return NotFound(new { message = "The candidate profile could not be found" });
     }
 
     return Ok(profile);

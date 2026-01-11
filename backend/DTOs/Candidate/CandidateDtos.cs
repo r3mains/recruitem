@@ -3,8 +3,8 @@ namespace backend.DTOs.Candidate
   public class CreateCandidateDto
   {
     public string FullName { get; set; } = string.Empty;
-    public string? ContactNumber { get; set; }
-    public string Email { get; set; } = string.Empty;
+    public string? ContactNumber { get; set; }    public string? College { get; set; }
+    public int? GraduationYear { get; set; }    public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
 
     public CreateAddressDto? Address { get; set; }
@@ -16,8 +16,8 @@ namespace backend.DTOs.Candidate
   public class UpdateCandidateDto
   {
     public string FullName { get; set; } = string.Empty;
-    public string? ContactNumber { get; set; }
-
+    public string? ContactNumber { get; set; }    public string? College { get; set; }
+    public int? GraduationYear { get; set; }
     public CreateAddressDto? Address { get; set; }
 
     public List<CreateCandidateSkillDto>? Skills { get; set; }
@@ -30,8 +30,8 @@ namespace backend.DTOs.Candidate
     public Guid UserId { get; set; }
     public string? FullName { get; set; }
     public string Email { get; set; } = string.Empty;
-    public string? ContactNumber { get; set; }
-    public DateTime CreatedAt { get; set; }
+    public string? ContactNumber { get; set; }    public string? College { get; set; }
+    public int? GraduationYear { get; set; }    public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
     public AddressDto? Address { get; set; }
@@ -48,8 +48,8 @@ namespace backend.DTOs.Candidate
     public Guid Id { get; set; }
     public string? FullName { get; set; }
     public string Email { get; set; } = string.Empty;
-    public string? ContactNumber { get; set; }
-    public DateTime CreatedAt { get; set; }
+    public string? ContactNumber { get; set; }    public string? College { get; set; }
+    public int? GraduationYear { get; set; }    public DateTime CreatedAt { get; set; }
     public string? Location { get; set; }
     public int ApplicationCount { get; set; }
     public int SkillCount { get; set; }

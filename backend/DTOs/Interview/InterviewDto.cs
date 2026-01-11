@@ -1,15 +1,10 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace backend.DTOs.Interview
 {
   public class CreateInterviewDto
   {
-    [Required]
     public Guid JobApplicationId { get; set; }
-
-    [Required]
     public Guid InterviewTypeId { get; set; }
-
+    public int RoundNumber { get; set; } = 1;
     public List<Guid> InterviewerIds { get; set; } = new List<Guid>();
   }
 
@@ -17,6 +12,7 @@ namespace backend.DTOs.Interview
   {
     public Guid? InterviewTypeId { get; set; }
     public Guid? StatusId { get; set; }
+    public int? RoundNumber { get; set; }
     public List<Guid>? InterviewerIds { get; set; }
   }
 
@@ -28,6 +24,7 @@ namespace backend.DTOs.Interview
     public string? JobTitle { get; set; }
     public Guid InterviewTypeId { get; set; }
     public string? InterviewType { get; set; }
+    public int RoundNumber { get; set; }
     public Guid? StatusId { get; set; }
     public string? Status { get; set; }
     public DateTime CreatedAt { get; set; }

@@ -13,18 +13,11 @@ namespace backend.Controllers;
 [ApiVersion("1.0")]
 [Route("jobs")]
 [Authorize]
-public class JobController : ControllerBase
+public class JobController(IJobRepository jobRepository, IEmployeeRepository employeeRepository, IMapper mapper) : ControllerBase
 {
-  private readonly IJobRepository _jobRepository;
-  private readonly IEmployeeRepository _employeeRepository;
-  private readonly IMapper _mapper;
-
-  public JobController(IJobRepository jobRepository, IEmployeeRepository employeeRepository, IMapper mapper)
-  {
-    _jobRepository = jobRepository;
-    _employeeRepository = employeeRepository;
-    _mapper = mapper;
-  }
+  private readonly IJobRepository _jobRepository = jobRepository;
+  private readonly IEmployeeRepository _employeeRepository = employeeRepository;
+  private readonly IMapper _mapper = mapper;
 
   [HttpPost]
   [Authorize(Policy = "ManageJobs")]
@@ -41,7 +34,7 @@ public class JobController : ControllerBase
       var employee = await _employeeRepository.GetEmployeeByUserIdAsync(userId);
       if (employee == null)
       {
-        return BadRequest("Employee profile not found");
+        return BadRequest("Your employee profile could not be found. Please contact support");
       }
 
       var job = _mapper.Map<Job>(createJobDto);
@@ -61,7 +54,7 @@ public class JobController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error creating job: {ex.Message}");
+      return BadRequest($"Unable to create job posting. Please try again or contact support if the issue persists. Details: {ex.Message}");
     }
   }
 
@@ -89,7 +82,64 @@ public class JobController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error retrieving jobs: {ex.Message}");
+      return BadRequest($"Unable to retrieve job listings. Please try again. Details: {ex.Message}");
+    }
+  }
+
+  [HttpGet("public/{id}")]
+  [AllowAnonymous]
+  public async Task<IActionResult> GetPublicJob(Guid id)
+  {
+    try
+    {
+      var job = await _jobRepository.GetJobDetailsByIdAsync(id);
+      if (job == null)
+      {
+        return NotFound("The job posting you're looking for could not be found");
+      }
+
+      // Only return open jobs for public view
+      var openStatus = await GetJobStatusByName(Consts.JobStatus.Open);
+      if (job.Status?.Id != openStatus.Id)
+      {
+        return NotFound("This job posting is not available");
+      }
+
+      return Ok(job);
+    }
+    catch (Exception ex)
+    {
+      return BadRequest($"Unable to retrieve job details. Please try again. Details: {ex.Message}");
+    }
+  }
+
+  [HttpGet("public")]
+  [AllowAnonymous]
+  public async Task<IActionResult> GetPublicJobs([FromQuery] int page = 1, [FromQuery] int pageSize = 10,
+      [FromQuery] string? search = null, [FromQuery] Guid? jobTypeId = null)
+  {
+    try
+    {
+      // Get only open job postings for public view
+      var openStatus = await GetJobStatusByName(Consts.JobStatus.Open);
+      var jobs = await _jobRepository.GetJobsAsync(page, pageSize, search, openStatus.Id, jobTypeId);
+      var totalCount = await _jobRepository.GetJobCountAsync(openStatus.Id);
+
+      return Ok(new
+      {
+        Jobs = jobs,
+        Pagination = new
+        {
+          Page = page,
+          PageSize = pageSize,
+          TotalCount = totalCount,
+          TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+        }
+      });
+    }
+    catch (Exception ex)
+    {
+      return BadRequest($"Unable to retrieve job listings. Please try again. Details: {ex.Message}");
     }
   }
 
@@ -102,14 +152,14 @@ public class JobController : ControllerBase
       var job = await _jobRepository.GetJobDetailsByIdAsync(id);
       if (job == null)
       {
-        return NotFound("Job not found");
+        return NotFound("The job posting you're looking for could not be found");
       }
 
       return Ok(job);
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error retrieving job: {ex.Message}");
+      return BadRequest($"Unable to retrieve job details. Please try again. Details: {ex.Message}");
     }
   }
 
@@ -122,13 +172,13 @@ public class JobController : ControllerBase
       var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
       if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
       {
-        return Unauthorized("Invalid user");
+        return Unauthorized("Unable to verify your identity. Please log in again");
       }
 
       var existingJob = await _jobRepository.GetJobByIdAsync(id);
       if (existingJob == null)
       {
-        return NotFound("Job not found");
+        return NotFound("The job posting you're trying to update could not be found");
       }
 
       var isAdmin = User.IsInRole(Consts.Roles.Admin);
@@ -180,7 +230,7 @@ public class JobController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error updating job: {ex.Message}");
+      return BadRequest($"Unable to update job posting. Please try again or contact support if the issue persists. Details: {ex.Message}");
     }
   }
 
@@ -193,12 +243,12 @@ public class JobController : ControllerBase
       var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
       if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid userId))
       {
-        return Unauthorized("Invalid user");
+        return Unauthorized("Unable to verify your identity. Please log in again");
       }
 
       if (!await _jobRepository.ExistsAsync(id))
       {
-        return NotFound("Job not found");
+        return NotFound("The job posting you're trying to delete could not be found");
       }
 
       var isAdmin = User.IsInRole(Consts.Roles.Admin);
@@ -212,7 +262,7 @@ public class JobController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error deleting job: {ex.Message}");
+      return BadRequest($"Unable to delete job posting. Please try again or contact support. Details: {ex.Message}");
     }
   }
 
@@ -225,7 +275,7 @@ public class JobController : ControllerBase
       var job = await _jobRepository.GetJobByIdAsync(id);
       if (job == null)
       {
-        return NotFound("Job not found");
+        return NotFound("The job posting you're trying to close could not be found");
       }
 
       var closedStatus = await GetJobStatusByName(Consts.JobStatus.Closed);
@@ -238,7 +288,7 @@ public class JobController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error closing job: {ex.Message}");
+      return BadRequest($"Unable to close job posting. Please try again. Details: {ex.Message}");
     }
   }
 
@@ -251,7 +301,7 @@ public class JobController : ControllerBase
       var job = await _jobRepository.GetJobByIdAsync(id);
       if (job == null)
       {
-        return NotFound("Job not found");
+        return NotFound("The job posting you're trying to put on hold could not be found");
       }
 
       var holdStatus = await GetJobStatusByName(Consts.JobStatus.OnHold);
@@ -263,7 +313,7 @@ public class JobController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error putting job on hold: {ex.Message}");
+      return BadRequest($"Unable to put job posting on hold. Please try again. Details: {ex.Message}");
     }
   }
 
@@ -290,7 +340,7 @@ public class JobController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error retrieving recruiter jobs: {ex.Message}");
+      return BadRequest($"Unable to retrieve recruiter's job postings. Please try again. Details: {ex.Message}");
     }
   }
 
@@ -305,7 +355,7 @@ public class JobController : ControllerBase
     }
     catch (Exception ex)
     {
-      return BadRequest($"Error retrieving position jobs: {ex.Message}");
+      return BadRequest($"Unable to retrieve jobs for this position. Please try again. Details: {ex.Message}");
     }
   }
 

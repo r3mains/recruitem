@@ -7,6 +7,7 @@ public interface ICandidateRepository
   Task<backend.Models.Candidate?> GetByUserIdAsync(Guid userId);
   Task<backend.Models.Candidate?> GetByEmailAsync(string email);
   Task<backend.Models.Candidate> CreateAsync(backend.Models.Candidate candidate);
+  Task<backend.Models.Candidate> CreateCandidateAsync(backend.Models.Candidate candidate);
   Task<backend.Models.Candidate> UpdateAsync(backend.Models.Candidate candidate);
   Task DeleteAsync(Guid id);
   Task<bool> ExistsByEmailAsync(string email, Guid? excludeId = null);

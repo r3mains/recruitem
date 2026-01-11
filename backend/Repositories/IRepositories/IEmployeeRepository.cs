@@ -4,6 +4,7 @@ namespace backend.Repositories.IRepositories
 {
   public interface IEmployeeRepository
   {
+    Task<IEnumerable<Employee>> GetAllEmployeesAsync();
     Task<Employee?> GetEmployeeByUserIdAsync(Guid userId);
     Task<Employee?> GetEmployeeByIdAsync(Guid id);
   }

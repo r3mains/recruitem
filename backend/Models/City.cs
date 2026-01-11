@@ -6,7 +6,6 @@ public class City
   public string CityName { get; set; } = string.Empty;
   public Guid StateId { get; set; }
 
-  // Navigation properties
   public State State { get; set; } = null!;
   public ICollection<Address> Addresses { get; set; } = [];
 }

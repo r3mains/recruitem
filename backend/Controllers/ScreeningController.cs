@@ -4,52 +4,40 @@ using Microsoft.AspNetCore.Mvc;
 using backend.DTOs.Screening;
 using backend.Repositories.IRepositories;
 using backend.Validators.ScreeningValidators;
+using backend.Services.IServices;
 
 namespace backend.Controllers;
 
 [ApiController]
 [Route("[controller]")]
 [ApiVersion("1.0")]
-[Authorize(Policy = "UserPolicy")]
-public class ScreeningController : ControllerBase
+public class ScreeningController(
+  IScreeningRepository screeningRepository,
+  ICandidateRepository candidateRepository,
+  IJobApplicationRepository jobApplicationRepository,
+  IPositionRepository positionRepository,
+  IEmployeeRepository employeeRepository,
+  IMapper mapper,
+  ScreenResumeValidator screenResumeValidator,
+  AddCommentValidator addCommentValidator,
+  UpdateCandidateSkillsValidator updateCandidateSkillsValidator,
+  AssignReviewerValidator assignReviewerValidator,
+  ShortlistCandidateValidator shortlistCandidateValidator,
+  IEmailService emailService) : ControllerBase
 {
-  private readonly IScreeningRepository _screeningRepository;
-  private readonly ICandidateRepository _candidateRepository;
-  private readonly IJobApplicationRepository _jobApplicationRepository;
-  private readonly IPositionRepository _positionRepository;
-  private readonly IEmployeeRepository _employeeRepository;
-  private readonly IMapper _mapper;
-  private readonly ScreenResumeValidator _screenResumeValidator;
-  private readonly AddCommentValidator _addCommentValidator;
-  private readonly UpdateCandidateSkillsValidator _updateCandidateSkillsValidator;
-  private readonly AssignReviewerValidator _assignReviewerValidator;
-  private readonly ShortlistCandidateValidator _shortlistCandidateValidator;
+  private readonly IScreeningRepository _screeningRepository = screeningRepository;
+  private readonly ICandidateRepository _candidateRepository = candidateRepository;
+  private readonly IJobApplicationRepository _jobApplicationRepository = jobApplicationRepository;
+  private readonly IPositionRepository _positionRepository = positionRepository;
+  private readonly IEmployeeRepository _employeeRepository = employeeRepository;
+  private readonly IMapper _mapper = mapper;
+  private readonly ScreenResumeValidator _screenResumeValidator = screenResumeValidator;
+  private readonly AddCommentValidator _addCommentValidator = addCommentValidator;
+  private readonly UpdateCandidateSkillsValidator _updateCandidateSkillsValidator = updateCandidateSkillsValidator;
+  private readonly AssignReviewerValidator _assignReviewerValidator = assignReviewerValidator;
+  private readonly ShortlistCandidateValidator _shortlistCandidateValidator = shortlistCandidateValidator;
+  private readonly IEmailService _emailService = emailService;
 
-  public ScreeningController(
-    IScreeningRepository screeningRepository,
-    ICandidateRepository candidateRepository,
-    IJobApplicationRepository jobApplicationRepository,
-    IPositionRepository positionRepository,
-    IEmployeeRepository employeeRepository,
-    IMapper mapper,
-    ScreenResumeValidator screenResumeValidator,
-    AddCommentValidator addCommentValidator,
-    UpdateCandidateSkillsValidator updateCandidateSkillsValidator,
-    AssignReviewerValidator assignReviewerValidator,
-    ShortlistCandidateValidator shortlistCandidateValidator)
-  {
-    _screeningRepository = screeningRepository;
-    _candidateRepository = candidateRepository;
-    _jobApplicationRepository = jobApplicationRepository;
-    _positionRepository = positionRepository;
-    _employeeRepository = employeeRepository;
-    _mapper = mapper;
-    _screenResumeValidator = screenResumeValidator;
-    _addCommentValidator = addCommentValidator;
-    _updateCandidateSkillsValidator = updateCandidateSkillsValidator;
-    _assignReviewerValidator = assignReviewerValidator;
-    _shortlistCandidateValidator = shortlistCandidateValidator;
-  }
 
   [HttpGet("applications")]
   [Authorize(Policy = "ScreenResumes")]
@@ -61,7 +49,7 @@ public class ScreeningController : ControllerBase
   {
     if (page < 1 || pageSize < 1 || pageSize > 100)
     {
-      return BadRequest("Page must be >= 1 and PageSize must be between 1 and 100");
+      return BadRequest("Invalid pagination parameters. Page must be 1 or greater, and page size must be between 1 and 100");
     }
 
     var applications = await _screeningRepository.GetApplicationsForScreeningAsync(positionId, search, page, pageSize);
@@ -96,6 +84,38 @@ public class ScreeningController : ControllerBase
 
     try
     {
+      // Check for previous screenings before processing
+      var currentApplication = await _jobApplicationRepository.GetByIdAsync(screenResumeDto.JobApplicationId);
+      if (currentApplication != null)
+      {
+        var previousApplications = await _jobApplicationRepository.GetAllAsync(
+          candidateId: currentApplication.CandidateId,
+          pageSize: 1000);
+        var previousScreenings = previousApplications
+          .Where(app => app.Id != currentApplication.Id && app.Comments.Any())
+          .ToList();
+
+        if (previousScreenings.Any())
+        {
+          // Send email notification to reviewer/recruiter about previous screening history
+          var reviewer = await _employeeRepository.GetEmployeeByUserIdAsync(userId.Value);
+          if (reviewer?.User?.Email != null)
+          {
+            var candidate = await _candidateRepository.GetByIdAsync(currentApplication.CandidateId);
+            var previousCount = previousScreenings.Count;
+            _ = Task.Run(async () => await _emailService.SendEmailAsync(new backend.Models.EmailRequest
+            {
+              To = reviewer.User.Email,
+              ToName = reviewer.FullName,
+              Subject = $"Previous Screening History Alert - {candidate?.FullName}",
+              Body = $"<p>Note: This candidate <strong>{candidate?.FullName}</strong> has been screened previously for {previousCount} other position(s).</p>" +
+                     $"<p>Please review their previous screening history before proceeding with the current evaluation.</p>",
+              IsHtml = true
+            }));
+          }
+        }
+      }
+
       var screenedApplication = await _screeningRepository.ScreenResumeAsync(
         screenResumeDto.JobApplicationId,
         screenResumeDto.Score,

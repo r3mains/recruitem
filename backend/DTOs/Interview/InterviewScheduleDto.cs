@@ -1,15 +1,9 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace backend.DTOs.Interview
 {
   public class CreateInterviewScheduleDto
   {
-    [Required]
     public Guid InterviewId { get; set; }
-
-    [Required]
     public DateTime ScheduledAt { get; set; }
-
     public string? Location { get; set; }
     public string? MeetingLink { get; set; }
   }

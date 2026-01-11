@@ -1,6 +1,8 @@
 .env
 backend/bin/
 backend/obj/
+backend/uploads/
+backend/Migrations/
 backend/.vs/
 backend/.env
 frontend/node_modules/
